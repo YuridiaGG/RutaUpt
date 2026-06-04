@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.rutaupt.model.Chofer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -17,22 +18,31 @@ fun AgregarChoferScreen(
     onVolver: () -> Unit
 ) {
 
-    var pantalla by remember {
-        mutableStateOf("menu")
-    }
+    var pantalla by remember { mutableStateOf("menu") }
+    var choferAEditar by remember { mutableStateOf<Chofer?>(null) }
 
     when (pantalla) {
 
         "formulario" -> {
-            FormularioChoferScreen {
-                pantalla = "menu"
-            }
+            FormularioChoferScreen(
+                choferEditar = choferAEditar,
+                onVolver = {
+                    pantalla = "menu"
+                    choferAEditar = null
+                }
+            )
         }
 
         "lista" -> {
-            ListaChoferesScreen {
-                pantalla = "menu"
-            }
+            ListaChoferesScreen(
+                onVolver = {
+                    pantalla = "menu"
+                },
+                onEditarChofer = { chofer ->
+                    choferAEditar = chofer
+                    pantalla = "formulario"
+                }
+            )
         }
 
         else -> {
@@ -62,6 +72,7 @@ fun AgregarChoferScreen(
 
                     Card(
                         onClick = {
+                            choferAEditar = null
                             pantalla = "formulario"
                         },
                         shape = RoundedCornerShape(16.dp),

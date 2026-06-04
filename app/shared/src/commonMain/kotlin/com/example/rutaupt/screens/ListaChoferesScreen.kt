@@ -20,7 +20,8 @@ import com.example.rutaupt.storage.ChoferRepository
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ListaChoferesScreen(
-    onVolver: () -> Unit
+    onVolver: () -> Unit,
+    onEditarChofer: (Chofer) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -55,7 +56,10 @@ fun ListaChoferesScreen(
                     ChoferRepository.choferes,
                     key = { it.id }
                 ) { chofer ->
-                    ChoferCard(chofer)
+                    ChoferCard(
+                        chofer = chofer,
+                        onEdit = { onEditarChofer(chofer) }
+                    )
                 }
             }
         }
@@ -64,7 +68,8 @@ fun ListaChoferesScreen(
 
 @Composable
 fun ChoferCard(
-    chofer: Chofer
+    chofer: Chofer,
+    onEdit: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -102,7 +107,7 @@ fun ChoferCard(
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(
-                    onClick = { /* Implementar edición */ }
+                    onClick = onEdit
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
