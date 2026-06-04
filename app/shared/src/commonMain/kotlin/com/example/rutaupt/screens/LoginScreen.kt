@@ -47,8 +47,7 @@ enum class TipoUsuario { ESTUDIANTE, CHOFER }
 
 @Composable
 fun LoginScreen(
-    onLoginEstudiante: (email: String, password: String) -> Unit = { _, _ -> },
-    onLoginChofer:     (matricula: String, password: String) -> Unit = { _, _ -> }
+    onLoginSuccess: (String) -> Unit = {}
 ) {
     var tipoSeleccionado by remember { mutableStateOf(TipoUsuario.ESTUDIANTE) }
 
@@ -99,8 +98,12 @@ fun LoginScreen(
                 label = "login_form"
             ) { tipo ->
                 when (tipo) {
-                    TipoUsuario.ESTUDIANTE -> FormularioEstudiante(onLoginEstudiante)
-                    TipoUsuario.CHOFER     -> FormularioChofer(onLoginChofer)
+                    TipoUsuario.ESTUDIANTE -> FormularioEstudiante { _, _ ->
+                        onLoginSuccess("estudiante")
+                    }
+                    TipoUsuario.CHOFER     -> FormularioChofer { _, _ ->
+                        onLoginSuccess("chofer")
+                    }
                 }
             }
 

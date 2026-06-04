@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AgregarChoferScreen(
     onVolver: () -> Unit
-) {a
+) {
 
     var pantalla by remember {
         mutableStateOf("menu")
