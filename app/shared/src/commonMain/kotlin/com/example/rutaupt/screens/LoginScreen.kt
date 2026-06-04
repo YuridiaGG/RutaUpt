@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,33 +20,13 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 
-
-//  Paleta de colores UPT (vino / guinda)
-
-object UPTColors {
-    val Vino        = Color(0xFF6B0F1A)   // Vino principal
-    val VinoOscuro  = Color(0xFF4A0A12)   // Fondo degradado
-    val VinoClaro   = Color(0xFF8B1A28)   // Hover / énfasis
-    val Dorado      = Color(0xFFD4A843)   // Acento dorado UPT
-    val DoradoClaro = Color(0xFFECC96A)   // Acento suave
-    val Blanco      = Color(0xFFFDF6F0)   // Texto principal
-    val BlancoSuave = Color(0xFFE8D5C4)   // Texto secundario
-    val Superficie  = Color(0x26FFFFFF)   // Card translúcida
-    val Error       = Color(0xFFFF6B6B)
-}
-
-
 //  Tipo de usuario
-
 enum class TipoUsuario { ESTUDIANTE, CHOFER }
 
-
 //  Pantalla principal de Login
-
 @Composable
 fun LoginScreen(
-    onLoginEstudiante: (email: String, password: String) -> Unit = { _, _ -> },
-    onLoginChofer:     (matricula: String, password: String) -> Unit = { _, _ -> }
+    onLoginSuccess: (String) -> Unit
 ) {
     var tipoSeleccionado by remember { mutableStateOf(TipoUsuario.ESTUDIANTE) }
 
@@ -99,8 +77,8 @@ fun LoginScreen(
                 label = "login_form"
             ) { tipo ->
                 when (tipo) {
-                    TipoUsuario.ESTUDIANTE -> FormularioEstudiante(onLoginEstudiante)
-                    TipoUsuario.CHOFER     -> FormularioChofer(onLoginChofer)
+                    TipoUsuario.ESTUDIANTE -> FormularioEstudiante(onLoginSuccess)
+                    TipoUsuario.CHOFER     -> FormularioChofer(onLoginSuccess)
                 }
             }
 
@@ -157,7 +135,7 @@ private fun DecorativeBackground() {
 @Composable
 private fun LogoUPT() {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Icono del autobús con fondo dorado
+        // Box decorativo sin icono
         Box(
             modifier = Modifier
                 .size(80.dp)
@@ -170,12 +148,7 @@ private fun LogoUPT() {
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Filled.DirectionsBus,
-                contentDescription = "RutaUPT",
-                tint = UPTColors.VinoOscuro,
-                modifier = Modifier.size(44.dp)
-            )
+            // Icono removido
         }
 
         Spacer(Modifier.height(16.dp))
@@ -212,7 +185,7 @@ private fun SelectorTipoUsuario(
             .padding(4.dp)
     ) {
         Row(Modifier.fillMaxWidth()) {
-            TipoUsuario.values().forEach { tipo ->
+            TipoUsuario.entries.forEach { tipo ->
                 val activo = seleccionado == tipo
                 Box(
                     modifier = Modifier
@@ -228,25 +201,12 @@ private fun SelectorTipoUsuario(
                         .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = if (tipo == TipoUsuario.ESTUDIANTE)
-                                Icons.Filled.School else Icons.Filled.DriveEta,
-                            contentDescription = null,
-                            tint = if (activo) UPTColors.VinoOscuro else UPTColors.BlancoSuave,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = if (tipo == TipoUsuario.ESTUDIANTE) "Estudiante" else "Chofer",
-                            color = if (activo) UPTColors.VinoOscuro else UPTColors.BlancoSuave,
-                            fontWeight = if (activo) FontWeight.Bold else FontWeight.Normal,
-                            fontSize = 14.sp
-                        )
-                    }
+                    Text(
+                        text = if (tipo == TipoUsuario.ESTUDIANTE) "Estudiante" else "Chofer",
+                        color = if (activo) UPTColors.VinoOscuro else UPTColors.BlancoSuave,
+                        fontWeight = if (activo) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 14.sp
+                    )
                 }
             }
         }
@@ -257,11 +217,10 @@ private fun SelectorTipoUsuario(
 //  Formulario Estudiante
 
 @Composable
-fun FormularioEstudiante(onLogin: (String, String) -> Unit) {
-    var email    by remember { mutableStateOf("") }
+fun FormularioEstudiante(onLoginSuccess: (String) -> Unit) {
+    var usuario  by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var verPass  by remember { mutableStateOf(false) }
-    var cargando by remember { mutableStateOf(false) }
 
     CardFormulario {
         Text(
@@ -271,7 +230,7 @@ fun FormularioEstudiante(onLogin: (String, String) -> Unit) {
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            "Ingresa con tu correo institucional",
+            "Ingresa con tus credenciales",
             color = UPTColors.BlancoSuave.copy(alpha = 0.7f),
             fontSize = 13.sp
         )
@@ -279,12 +238,11 @@ fun FormularioEstudiante(onLogin: (String, String) -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         CampoTexto(
-            valor = email,
-            onValorChange = { email = it },
-            label = "Correo institucional",
-            placeholder = "matricula@upt.edu.mx",
-            leadingIcon = Icons.Filled.Email,
-            keyboardType = KeyboardType.Email
+            valor = usuario,
+            onValorChange = { usuario = it },
+            label = "Usuario",
+            placeholder = "admin, estudiante, chofer",
+            keyboardType = KeyboardType.Text
         )
 
         Spacer(Modifier.height(16.dp))
@@ -294,7 +252,6 @@ fun FormularioEstudiante(onLogin: (String, String) -> Unit) {
             onValorChange = { password = it },
             label = "Contraseña",
             placeholder = "••••••••",
-            leadingIcon = Icons.Filled.Lock,
             esPassword = true,
             verPassword = verPass,
             onTogglePassword = { verPass = !verPass }
@@ -308,17 +265,22 @@ fun FormularioEstudiante(onLogin: (String, String) -> Unit) {
             fontSize = 13.sp,
             modifier = Modifier
                 .align(Alignment.End)
-                .clickable { /* navegar a recuperación */ }
+                .clickable { }
         )
 
         Spacer(Modifier.height(28.dp))
 
         BotonLogin(
             texto = "Iniciar Sesión",
-            cargando = cargando,
             onClick = {
-                cargando = true
-                onLogin(email, password)
+                if (password == "123") {
+                    val rol = usuario.lowercase().trim()
+                    if (rol == "admin" || rol == "chofer" || rol == "estudiante") {
+                        onLoginSuccess(rol)
+                    } else {
+                        onLoginSuccess("estudiante")
+                    }
+                }
             }
         )
     }
@@ -328,11 +290,10 @@ fun FormularioEstudiante(onLogin: (String, String) -> Unit) {
 //  Formulario Chofer
 
 @Composable
-fun FormularioChofer(onLogin: (String, String) -> Unit) {
-    var matricula by remember { mutableStateOf("") }
+fun FormularioChofer(onLoginSuccess: (String) -> Unit) {
+    var usuario by remember { mutableStateOf("") }
     var password  by remember { mutableStateOf("") }
     var verPass   by remember { mutableStateOf(false) }
-    var cargando  by remember { mutableStateOf(false) }
 
     CardFormulario {
         Text(
@@ -342,7 +303,7 @@ fun FormularioChofer(onLogin: (String, String) -> Unit) {
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            "Ingresa con tu número de empleado",
+            "Ingresa con tus credenciales",
             color = UPTColors.BlancoSuave.copy(alpha = 0.7f),
             fontSize = 13.sp
         )
@@ -350,11 +311,10 @@ fun FormularioChofer(onLogin: (String, String) -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         CampoTexto(
-            valor = matricula,
-            onValorChange = { matricula = it },
-            label = "Número de empleado",
-            placeholder = "EMP-0000",
-            leadingIcon = Icons.Filled.Badge
+            valor = usuario,
+            onValorChange = { usuario = it },
+            label = "Usuario",
+            placeholder = "admin, estudiante, chofer"
         )
 
         Spacer(Modifier.height(16.dp))
@@ -364,7 +324,6 @@ fun FormularioChofer(onLogin: (String, String) -> Unit) {
             onValorChange = { password = it },
             label = "Contraseña",
             placeholder = "••••••••",
-            leadingIcon = Icons.Filled.Lock,
             esPassword = true,
             verPassword = verPass,
             onTogglePassword = { verPass = !verPass }
@@ -378,17 +337,22 @@ fun FormularioChofer(onLogin: (String, String) -> Unit) {
             fontSize = 13.sp,
             modifier = Modifier
                 .align(Alignment.End)
-                .clickable { /* soporte */ }
+                .clickable { }
         )
 
         Spacer(Modifier.height(28.dp))
 
         BotonLogin(
             texto = "Ingresar",
-            cargando = cargando,
             onClick = {
-                cargando = true
-                onLogin(matricula, password)
+                if (password == "123") {
+                    val rol = usuario.lowercase().trim()
+                    if (rol == "admin" || rol == "chofer" || rol == "estudiante") {
+                        onLoginSuccess(rol)
+                    } else {
+                        onLoginSuccess("chofer")
+                    }
+                }
             }
         )
     }
@@ -419,7 +383,6 @@ private fun CampoTexto(
     onValorChange: (String) -> Unit,
     label: String,
     placeholder: String,
-    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
     keyboardType: KeyboardType = KeyboardType.Text,
     esPassword: Boolean = false,
     verPassword: Boolean = false,
@@ -431,16 +394,13 @@ private fun CampoTexto(
         modifier = Modifier.fillMaxWidth(),
         label = { Text(label, color = UPTColors.BlancoSuave.copy(alpha = 0.7f)) },
         placeholder = { Text(placeholder, color = UPTColors.BlancoSuave.copy(alpha = 0.35f)) },
-        leadingIcon = {
-            Icon(leadingIcon, contentDescription = null, tint = UPTColors.DoradoClaro)
-        },
         trailingIcon = if (esPassword && onTogglePassword != null) {
             {
                 IconButton(onClick = onTogglePassword) {
-                    Icon(
-                        imageVector = if (verPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                        contentDescription = null,
-                        tint = UPTColors.BlancoSuave.copy(alpha = 0.6f)
+                    Text(
+                        text = if (verPassword) "Ocultar" else "Ver",
+                        color = UPTColors.BlancoSuave.copy(alpha = 0.6f),
+                        fontSize = 12.sp
                     )
                 }
             }
@@ -464,7 +424,6 @@ private fun CampoTexto(
 @Composable
 private fun BotonLogin(
     texto: String,
-    cargando: Boolean,
     onClick: () -> Unit
 ) {
     Button(
@@ -474,8 +433,7 @@ private fun BotonLogin(
             .height(54.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-        contentPadding = PaddingValues(0.dp),
-        enabled = !cargando
+        contentPadding = PaddingValues(0.dp)
     ) {
         Box(
             modifier = Modifier
@@ -486,21 +444,13 @@ private fun BotonLogin(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            if (cargando) {
-                CircularProgressIndicator(
-                    color = UPTColors.VinoOscuro,
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.5.dp
-                )
-            } else {
-                Text(
-                    text = texto,
-                    color = UPTColors.VinoOscuro,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    letterSpacing = 0.5.sp
-                )
-            }
+            Text(
+                text = texto,
+                color = UPTColors.VinoOscuro,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                letterSpacing = 0.5.sp
+            )
         }
     }
 }

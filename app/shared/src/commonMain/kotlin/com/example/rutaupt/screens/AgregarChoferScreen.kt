@@ -3,6 +3,7 @@ package com.example.rutaupt.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
@@ -10,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgregarChoferScreen(
     onVolver: () -> Unit
@@ -40,6 +42,11 @@ fun AgregarChoferScreen(
                     TopAppBar(
                         title = {
                             Text("Gestión de Choferes")
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onVolver) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                            }
                         }
                     )
                 }
@@ -57,7 +64,8 @@ fun AgregarChoferScreen(
                         onClick = {
                             pantalla = "formulario"
                         },
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
 
                         Row(
@@ -85,7 +93,8 @@ fun AgregarChoferScreen(
                         onClick = {
                             pantalla = "lista"
                         },
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
 
                         Row(
@@ -107,13 +116,6 @@ fun AgregarChoferScreen(
                                 "Ver Choferes"
                             )
                         }
-                    }
-
-                    Button(
-                        onClick = onVolver,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Regresar")
                     }
                 }
             }
