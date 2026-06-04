@@ -2,6 +2,7 @@ package com.example.rutaupt.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -15,102 +16,117 @@ import com.example.rutaupt.storage.ChoferRepository
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FormularioChoferScreen(
+    choferEditar: Chofer? = null,
     onVolver: () -> Unit
 ) {
+    val modoEdicion = choferEditar != null
 
-    var nombre by remember { mutableStateOf("") }
-    var apellido by remember { mutableStateOf("") }
-    var unidad by remember { mutableStateOf("") }
-    var telefono by remember { mutableStateOf("") }
-    var salida by remember { mutableStateOf("") }
-    var llegada by remember { mutableStateOf("") }
+    var nombre by remember { mutableStateOf(choferEditar?.nombre ?: "") }
+    var apellido by remember { mutableStateOf(choferEditar?.apellido ?: "") }
+    var unidad by remember { mutableStateOf(choferEditar?.numeroUnidad ?: "") }
+    var telefono by remember { mutableStateOf(choferEditar?.telefono ?: "") }
+    var horaSalida by remember { mutableStateOf(choferEditar?.horaSalida ?: "") }
+    var horaLlegada by remember { mutableStateOf(choferEditar?.horaLlegada ?: "") }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Nuevo Chofer") },
+                title = { Text(if (modoEdicion) "Editar Chofer" else "Nuevo Chofer") },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver"
+                        )
                     }
                 }
             )
         }
-    ) { padding ->
-
+    ) { paddingValues ->
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
+                .padding(paddingValues)
                 .padding(16.dp)
+                .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-
             OutlinedTextField(
                 value = nombre,
                 onValueChange = { nombre = it },
                 label = { Text("Nombre") },
                 modifier = Modifier.fillMaxWidth()
             )
-
             OutlinedTextField(
                 value = apellido,
                 onValueChange = { apellido = it },
                 label = { Text("Apellido") },
                 modifier = Modifier.fillMaxWidth()
             )
-
             OutlinedTextField(
                 value = unidad,
                 onValueChange = { unidad = it },
                 label = { Text("Número de Unidad") },
                 modifier = Modifier.fillMaxWidth()
             )
-
             OutlinedTextField(
                 value = telefono,
                 onValueChange = { telefono = it },
                 label = { Text("Teléfono") },
                 modifier = Modifier.fillMaxWidth()
             )
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = horaSalida,
+                    onValueChange = { horaSalida = it },
+                    label = { Text("Salida") },
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = horaLlegada,
+                    onValueChange = { horaLlegada = it },
+                    label = { Text("Llegada") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
-            OutlinedTextField(
-                value = salida,
-                onValueChange = { salida = it },
-                label = { Text("Hora Salida") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = llegada,
-                onValueChange = { llegada = it },
-                label = { Text("Hora Llegada") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                modifier = Modifier.fillMaxWidth(),
                 onClick = {
-                    if (nombre.isNotBlank() && unidad.isNotBlank()) {
-                        ChoferRepository.choferes.add(
-                            Chofer(
-                                id = ChoferRepository.choferes.size + 1,
+                    if (modoEdicion) {
+                        val index = ChoferRepository.choferes.indexOfFirst { it.id == choferEditar.id }
+                        if (index != -1) {
+                            ChoferRepository.choferes[index] = choferEditar.copy(
                                 nombre = nombre,
                                 apellido = apellido,
                                 numeroUnidad = unidad,
                                 telefono = telefono,
-                                horaSalida = salida,
-                                horaLlegada = llegada
+                                horaSalida = horaSalida,
+                                horaLlegada = horaLlegada
+                            )
+                        }
+                    } else {
+                        val nuevoId = if (ChoferRepository.choferes.isEmpty()) 1 else ChoferRepository.choferes.maxOf { it.id } + 1
+                        ChoferRepository.choferes.add(
+                            Chofer(
+                                id = nuevoId,
+                                nombre = nombre,
+                                apellido = apellido,
+                                numeroUnidad = unidad,
+                                telefono = telefono,
+                                horaSalida = horaSalida,
+                                horaLlegada = horaLlegada
                             )
                         )
-                        onVolver()
                     }
-                }
+                    onVolver()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Text("Guardar Chofer")
+                Text(if (modoEdicion) "Actualizar Datos" else "Guardar Chofer")
             }
         }
     }
