@@ -21,7 +21,7 @@ import com.example.rutaupt.storage.ChoferRepository
 @Composable
 fun ListaChoferesScreen(
     onVolver: () -> Unit,
-    onEditarChofer: (Chofer) -> Unit
+    onEditarChofer: (Chofer) -> Unit,
 ) {
     Scaffold(
         topBar = {
