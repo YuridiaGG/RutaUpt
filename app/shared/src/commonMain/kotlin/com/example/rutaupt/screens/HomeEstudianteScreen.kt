@@ -16,4 +16,3 @@ fun HomeEstudianteScreen() {
         Text("Bienvenido Estudiante a RutaUPT")
     }
 }
-git
