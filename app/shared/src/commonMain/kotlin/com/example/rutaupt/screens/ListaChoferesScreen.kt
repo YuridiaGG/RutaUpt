@@ -27,7 +27,10 @@ import com.example.rutaupt.storage.ChoferRepository
 @Composable
 fun ListaChoferesScreen(
     onVolver: () -> Unit,
+<<<<<<< HEAD
     onAgregarChofer: () -> Unit,
+=======
+>>>>>>> 02d9e061b74cb7907381fed3dc65f49648b87484
     onEditarChofer: (Chofer) -> Unit
 ) {
     val vinoUpt = UPTColors.Vino
@@ -73,11 +76,21 @@ fun ListaChoferesScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+<<<<<<< HEAD
                 items(ChoferRepository.choferes) { chofer ->
                     ChoferPerfilCard(
                         chofer = chofer,
                         onVer = { /* Implementar ver detalles si es necesario */ },
                         onEditar = { onEditarChofer(chofer) }
+=======
+                items(
+                    ChoferRepository.choferes,
+                    key = { it.id }
+                ) { chofer ->
+                    ChoferCard(
+                        chofer = chofer,
+                        onEdit = { onEditarChofer(chofer) }
+>>>>>>> 02d9e061b74cb7907381fed3dc65f49648b87484
                     )
                 }
             }
@@ -86,10 +99,16 @@ fun ListaChoferesScreen(
 }
 
 @Composable
+<<<<<<< HEAD
 fun ChoferPerfilCard(
     chofer: Chofer,
     onVer: () -> Unit,
     onEditar: () -> Unit
+=======
+fun ChoferCard(
+    chofer: Chofer,
+    onEdit: () -> Unit
+>>>>>>> 02d9e061b74cb7907381fed3dc65f49648b87484
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -97,11 +116,47 @@ fun ChoferPerfilCard(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
+<<<<<<< HEAD
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier.size(50.dp).background(UPTColors.Vino.copy(alpha = 0.1f), CircleShape),
                     contentAlignment = Alignment.Center
+=======
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${chofer.nombre} ${chofer.apellido}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Unidad: ${chofer.numeroUnidad}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text("Tel: ${chofer.telefono}", style = MaterialTheme.typography.bodyMedium)
+            Text("Horario: ${chofer.horaSalida} - ${chofer.horaLlegada}", style = MaterialTheme.typography.bodyMedium)
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = onEdit
+>>>>>>> 02d9e061b74cb7907381fed3dc65f49648b87484
                 ) {
                     Icon(Icons.Default.Person, contentDescription = null, tint = UPTColors.Vino)
                 }
