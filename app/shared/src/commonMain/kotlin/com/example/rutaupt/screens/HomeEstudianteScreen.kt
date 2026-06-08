@@ -1,18 +1,24 @@
 package com.example.rutaupt.screens
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 @Composable
-fun HomeEstudianteScreen() {
+fun HomeEstudianteScreen(onVerRuta: () -> Unit = {}) {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Text("Bienvenido Estudiante a RutaUPT")
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("Bienvenido Estudiante a RutaUPT")
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onVerRuta) {
+                Text("Ver Ruta Actual")
+            }
+        }
     }
 }
