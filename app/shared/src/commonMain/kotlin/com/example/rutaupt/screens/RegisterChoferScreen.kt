@@ -16,24 +16,22 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.rutaupt.model.Chofer
-import com.example.rutaupt.storage.ChoferRepository
-import com.example.rutaupt.storage.ChoferLogger
+import com.example.rutaupt.getPlatform
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FormularioChoferScreen(
-    choferElegido: Chofer? = null,
-    onVolver: () -> Unit
+fun RegisterChoferScreen(
+    onBack: () -> Unit,
+    onRegisterSuccess: () -> Unit
 ) {
-    var nombre by remember { mutableStateOf(choferElegido?.nombre ?: "") }
-    var apellidos by remember { mutableStateOf(choferElegido?.apellidos ?: "") }
-    var edad by remember { mutableStateOf(choferElegido?.edad ?: "") }
-    var telefono by remember { mutableStateOf(choferElegido?.telefono ?: "") }
-    var numeroUnidad by remember { mutableStateOf(choferElegido?.numeroUnidad ?: "") }
-    var email by remember { mutableStateOf(choferElegido?.email ?: "") }
-    var password by remember { mutableStateOf(choferElegido?.contrasena ?: "") }
-    var confirmPassword by remember { mutableStateOf(choferElegido?.contrasena ?: "") }
+    var nombre by remember { mutableStateOf("") }
+    var apellidos by remember { mutableStateOf("") }
+    var edad by remember { mutableStateOf("") }
+    var telefono by remember { mutableStateOf("") }
+    var numeroUnidad by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
 
     val vinoUpt = UPTColors.Vino
@@ -41,9 +39,9 @@ fun FormularioChoferScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (choferElegido == null) "Agregar Chofer" else "Editar Chofer", fontWeight = FontWeight.Bold) },
+                title = { Text("Registro Chofer", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onVolver) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Regresar")
                     }
                 }
@@ -59,6 +57,13 @@ fun FormularioChoferScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Text(
+                text = "Datos del Chofer",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = vinoUpt
+            )
+
             OutlinedTextField(
                 value = nombre,
                 onValueChange = { nombre = it },
@@ -142,42 +147,16 @@ fun FormularioChoferScreen(
 
             Button(
                 onClick = {
-                    if (nombre.isNotBlank() && numeroUnidad.isNotBlank()) {
-                        if (choferElegido == null) {
-                            ChoferLogger.agregarChofer(
-                                Chofer(
-                                    id = ChoferRepository.choferes.size + 1,
-                                    nombre = nombre,
-                                    apellidos = apellidos,
-                                    edad = edad,
-                                    telefono = telefono,
-                                    numeroUnidad = numeroUnidad,
-                                    email = email,
-                                    contrasena = password
-                                )
-                            )
-                        } else {
-                            val index = ChoferRepository.choferes.indexOf(choferElegido)
-                            if (index != -1) {
-                                ChoferRepository.choferes[index] = choferElegido.copy(
-                                    nombre = nombre,
-                                    apellidos = apellidos,
-                                    edad = edad,
-                                    telefono = telefono,
-                                    numeroUnidad = numeroUnidad,
-                                    email = email,
-                                    contrasena = password
-                                )
-                            }
-                        }
-                        onVolver()
+                    if (nombre.isNotBlank()) {
+                        getPlatform().showNotification("RutaUPT", "¡Bienvenido(a) Chofer $nombre!")
                     }
+                    onRegisterSuccess()
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
             ) {
-                Text(if (choferElegido == null) "Guardar Chofer" else "Actualizar Datos", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Registrar Unidad", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

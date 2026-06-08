@@ -10,39 +10,47 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.rutaupt.model.Chofer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgregarChoferScreen(
     onVolver: () -> Unit
 ) {
-
-    var pantalla by remember {
-        mutableStateOf("menu")
-    }
+    var pantalla by remember { mutableStateOf("menu") }
+    var choferAEditar by remember { mutableStateOf<Chofer?>(null) }
 
     when (pantalla) {
-
         "formulario" -> {
-            FormularioChoferScreen {
-                pantalla = "menu"
-            }
+            FormularioChoferScreen(
+                choferElegido = choferAEditar,
+                onVolver = {
+                    pantalla = "menu"
+                }
+            )
         }
 
         "lista" -> {
-            ListaChoferesScreen {
-                pantalla = "menu"
-            }
+            ListaChoferesScreen(
+                onVolver = {
+                    pantalla = "menu"
+                },
+                onAgregarChofer = {
+                    choferAEditar = null
+                    pantalla = "formulario"
+                },
+                onEditarChofer = { chofer ->
+                    choferAEditar = chofer
+                    pantalla = "formulario"
+                }
+            )
         }
 
         else -> {
-
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = {
-                            Text("Gestión de Choferes")
-                        },
+                        title = { Text("Gestión de Choferes") },
                         navigationIcon = {
                             IconButton(onClick = onVolver) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -51,7 +59,6 @@ fun AgregarChoferScreen(
                     )
                 }
             ) { padding ->
-
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -59,33 +66,22 @@ fun AgregarChoferScreen(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-
                     Card(
                         onClick = {
+                            choferAEditar = null
                             pantalla = "formulario"
                         },
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp)
                         ) {
-
-                            Icon(
-                                Icons.Default.DirectionsBus,
-                                contentDescription = null
-                            )
-
-                            Spacer(
-                                modifier = Modifier.width(12.dp)
-                            )
-
-                            Text(
-                                "Agregar Chofer Nuevo"
-                            )
+                            Icon(Icons.Default.DirectionsBus, contentDescription = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Agregar Chofer Nuevo")
                         }
                     }
 
@@ -96,25 +92,14 @@ fun AgregarChoferScreen(
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp)
                         ) {
-
-                            Icon(
-                                Icons.Default.List,
-                                contentDescription = null
-                            )
-
-                            Spacer(
-                                modifier = Modifier.width(12.dp)
-                            )
-
-                            Text(
-                                "Ver Choferes"
-                            )
+                            Icon(Icons.Default.List, contentDescription = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Ver Choferes")
                         }
                     }
                 }
