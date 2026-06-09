@@ -17,7 +17,7 @@ import com.example.rutaupt.storage.ChoferRepository
 @Composable
 fun FormularioChoferScreen(
     choferEditar: Chofer? = null,
-    onVolver: () -> Unit
+    onVolver: () -> Unit,
 ) {
     val modoEdicion = choferEditar != null
 
@@ -95,7 +95,7 @@ fun FormularioChoferScreen(
 
             Button(
                 onClick = {
-                    if (modoEdicion) {
+                    if (choferEditar != null) {
                         val index = ChoferRepository.choferes.indexOfFirst { it.id == choferEditar.id }
                         if (index != -1) {
                             ChoferRepository.choferes[index] = choferEditar.copy(

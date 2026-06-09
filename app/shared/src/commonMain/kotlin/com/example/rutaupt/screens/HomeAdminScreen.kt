@@ -26,11 +26,9 @@ fun HomeAdminScreen() {
     }
 
     if (mostrarFormulario) {
-        AgregarChoferScreen(
-            onVolver = {
-                mostrarFormulario = false
-            }
-        )
+        AgregarChoferScreen {
+            mostrarFormulario = false
+        }
         return
     }
 
@@ -43,7 +41,7 @@ fun HomeAdminScreen() {
                         fontWeight = FontWeight.SemiBold
                     )
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.White
                 )
             )
@@ -297,7 +295,7 @@ fun NotificationItem(text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
 
         Box(
