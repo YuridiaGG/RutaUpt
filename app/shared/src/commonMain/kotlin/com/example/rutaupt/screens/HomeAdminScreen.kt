@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeAdminScreen() {
+fun HomeAdminScreen(onVerRuta: () -> Unit = {}) {
     
     var mostrarFormulario by remember {
         mutableStateOf(false)
@@ -137,7 +137,8 @@ fun HomeAdminScreen() {
                     AdminGridCard(
                         title = "Rutas",
                         icon = Icons.Default.Map,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onClick = onVerRuta
                     )
 
                     AdminGridCard(

@@ -7,382 +7,404 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.*
+import com.example.rutaupt.R
 
-//  Tipo de usuario
-enum class TipoUsuario { ESTUDIANTE, CHOFER }
+// ─────────────────────────────────────────────────────────────────────────────
+//  Colores UPT
+// ─────────────────────────────────────────────────────────────────────────────
+object UPTColors {
+    val Vino        = Color(0xFF6B0F1A)
+    val Blanco      = Color(0xFFFFFFFF)
+    val Negro       = Color(0xFF111111)
+    val GrisMedio   = Color(0xFF888888)
+    val GrisClaro   = Color(0xFFDDDDDD)
+    val FondoInput  = Color(0xFFFAFAFA)
+    val FondoHero   = Color(0xFFF2F2F2)
+    val Pasto       = Color(0xFFC8E6C9)
+}
 
+// ─────────────────────────────────────────────────────────────────────────────
 //  Pantalla principal de Login
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun LoginScreen(
     onLoginSuccess: (String) -> Unit
 ) {
-    var tipoSeleccionado by remember { mutableStateOf(TipoUsuario.ESTUDIANTE) }
-
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(UPTColors.VinoOscuro, UPTColors.Vino, UPTColors.VinoClaro)
-                )
-            )
+            .background(UPTColors.Blanco)
+            .verticalScroll(rememberScrollState())
     ) {
-        // Círculos decorativos de fondo
-        DecorativeBackground()
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(Modifier.height(56.dp))
-
-            // Logo / encabezado
-            LogoUPT()
-
-            Spacer(Modifier.height(36.dp))
-
-            // Selector de tipo de usuario
-            SelectorTipoUsuario(
-                seleccionado = tipoSeleccionado,
-                onSeleccionar = { tipoSeleccionado = it }
-            )
-
-            Spacer(Modifier.height(28.dp))
-
-            // Formulario animado según el tipo
-            AnimatedContent(
-                targetState = tipoSeleccionado,
-                transitionSpec = {
-                    val direction = if (targetState == TipoUsuario.CHOFER) 1 else -1
-                    fadeIn(tween(300)) + slideInHorizontally(
-                        animationSpec = tween(300),
-                        initialOffsetX = { fullWidth -> fullWidth * direction }
-                    ) togetherWith fadeOut(tween(200))
-                },
-                label = "login_form"
-            ) { tipo ->
-                when (tipo) {
-                    TipoUsuario.ESTUDIANTE -> FormularioEstudiante(onLoginSuccess)
-                    TipoUsuario.CHOFER     -> FormularioChofer(onLoginSuccess)
-                }
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            Text(
-                text = "Universidad Politécnica de Tulancingo",
-                color = UPTColors.BlancoSuave.copy(alpha = 0.6f),
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(24.dp))
-        }
+        SeccionHero()
+        SeccionLogo()
+        SeccionFormulario(onLoginSuccess = onLoginSuccess)
+        SeccionFooter()
     }
 }
 
-
-//  Fondo decorativo
-
+// ─────────────────────────────────────────────────────────────────────────────
+//  Hero: microbús con logo UPT encima
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun DecorativeBackground() {
-    val infiniteTransition = rememberInfiniteTransition(label = "bg")
-    val offset by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 10f,
-        animationSpec = infiniteRepeatable(tween(4000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "offset"
-    )
-
-    Box(Modifier.fillMaxSize()) {
-        // Círculo superior derecho
-        Box(
-            Modifier
-                .size(260.dp)
-                .offset(x = 120.dp, y = (-60 + offset).dp)
-                .clip(CircleShape)
-                .background(UPTColors.Dorado.copy(alpha = 0.08f))
-                .align(Alignment.TopEnd)
-        )
-        // Círculo inferior izquierdo
-        Box(
-            Modifier
-                .size(200.dp)
-                .offset(x = (-80).dp, y = (60 - offset).dp)
-                .clip(CircleShape)
-                .background(UPTColors.DoradoClaro.copy(alpha = 0.06f))
-                .align(Alignment.BottomStart)
-        )
-    }
-}
-
-
-//  Logo UPT
-
-@Composable
-private fun LogoUPT() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Box decorativo sin icono
-        Box(
-            modifier = Modifier
-                .size(80.dp)
-                .shadow(16.dp, CircleShape)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        listOf(UPTColors.Dorado, UPTColors.DoradoClaro.copy(alpha = 0.7f))
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            // Icono removido
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        Text(
-            text = "RutaUPT",
-            color = UPTColors.Blanco,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 2.sp
-        )
-        Text(
-            text = "Sistema de Transporte Universitario",
-            color = UPTColors.DoradoClaro,
-            fontSize = 13.sp,
-            letterSpacing = 0.5.sp
-        )
-    }
-}
-
-
-//  Selector Estudiante / Chofer
-
-@Composable
-private fun SelectorTipoUsuario(
-    seleccionado: TipoUsuario,
-    onSeleccionar: (TipoUsuario) -> Unit
-) {
+private fun SeccionHero() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(50))
-            .background(Color(0x33000000))
-            .padding(4.dp)
+            .height(200.dp)
+            .background(UPTColors.FondoHero)
     ) {
-        Row(Modifier.fillMaxWidth()) {
-            TipoUsuario.entries.forEach { tipo ->
-                val activo = seleccionado == tipo
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(50))
-                        .background(
-                            if (activo)
-                                Brush.horizontalGradient(listOf(UPTColors.Dorado, UPTColors.DoradoClaro))
-                            else
-                                Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
-                        )
-                        .clickable { onSeleccionar(tipo) }
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (tipo == TipoUsuario.ESTUDIANTE) "Estudiante" else "Chofer",
-                        color = if (activo) UPTColors.VinoOscuro else UPTColors.BlancoSuave,
-                        fontWeight = if (activo) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 14.sp
+        // Pasto en la parte baja
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .align(Alignment.BottomCenter)
+                .background(UPTColors.Pasto)
+        )
+
+        // Microbús centrado
+        MicrobusDibujo(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 24.dp, start = 16.dp, end = 16.dp)
+        )
+
+        // Círculo vino con logo UPT encima del bus
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .align(Alignment.TopCenter)
+                .offset(y = 16.dp)
+                .clip(CircleShape)
+                .background(UPTColors.Vino),
+            contentAlignment = Alignment.Center
+        ) {
+            // Usamos un icono por defecto si el recurso no está listo, 
+            // pero mantenemos la estructura de Rama1
+            Icon(
+                imageVector = Icons.Default.School,
+                contentDescription = "Logo UPT",
+                modifier = Modifier
+                    .size(50.dp)
+                    .padding(6.dp),
+                tint = Color.White
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Microbús dibujado con Boxes
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun MicrobusDibujo(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        // Cuerpo del bus
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(68.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(UPTColors.Vino)
+        ) {
+            // Franja blanca sutil
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .align(Alignment.Center)
+                    .background(Color.White.copy(alpha = 0.18f))
+            )
+
+            // Letras UPT en el costado
+            Box(
+                modifier = Modifier
+                    .size(width = 60.dp, height = 28.dp)
+                    .align(Alignment.Center)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "UPT",
+                    color = Color.White,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 3.sp
+                )
+            }
+
+            // Ventanas (fila superior)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                repeat(5) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(20.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFFAED6F1).copy(alpha = 0.85f))
                     )
                 }
+            }
+        }
+
+        // Ruedas
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 30.dp)
+                .align(Alignment.BottomCenter)
+                .offset(y = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Rueda izquierda
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1A1A1A))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFCCCCCC))
+                        .align(Alignment.Center)
+                )
+            }
+            // Rueda derecha
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF1A1A1A))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFCCCCCC))
+                        .align(Alignment.Center)
+                )
             }
         }
     }
 }
 
-
-//  Formulario Estudiante
-
+// ─────────────────────────────────────────────────────────────────────────────
+//  Logo "RutaUPT" y tagline
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
-fun FormularioEstudiante(onLoginSuccess: (String) -> Unit) {
-    var usuario  by remember { mutableStateOf("") }
+private fun SeccionLogo() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(UPTColors.Blanco)
+            .padding(top = 14.dp, bottom = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Filled.LocationOn,
+                contentDescription = null,
+                tint = UPTColors.Vino,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = buildAnnotatedString {
+                    append("Ruta")
+                    withStyle(SpanStyle(color = UPTColors.Vino, fontWeight = FontWeight.Bold)) {
+                        append("UPT")
+                    }
+                },
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = UPTColors.Negro
+            )
+        }
+
+        Text(
+            text = "— Tu ruta, nuestra pasión —",
+            fontSize = 11.sp,
+            color = UPTColors.Vino,
+            fontStyle = FontStyle.Italic,
+            letterSpacing = 0.3.sp
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Formulario de login
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun SeccionFormulario(onLoginSuccess: (String) -> Unit) {
+    var email    by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var verPass  by remember { mutableStateOf(false) }
+    var cargando by remember { mutableStateOf(false) }
 
-    CardFormulario {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(UPTColors.Blanco)
+            .padding(horizontal = 22.dp)
+    ) {
+        Spacer(Modifier.height(6.dp))
+
+        // Título bienvenida
         Text(
-            "Acceso Estudiante",
-            color = UPTColors.Blanco,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold
+            text = buildAnnotatedString {
+                append("Bienvenido a ")
+                withStyle(SpanStyle(color = UPTColors.Vino)) {
+                    append("RutaUPT")
+                }
+            },
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = UPTColors.Negro
         )
+
         Text(
-            "Ingresa con tus credenciales",
-            color = UPTColors.BlancoSuave.copy(alpha = 0.7f),
-            fontSize = 13.sp
+            text = "Inicia sesión para continuar",
+            fontSize = 13.sp,
+            color = UPTColors.GrisMedio,
+            modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
         )
 
-        Spacer(Modifier.height(24.dp))
-
+        // Campo correo
         CampoTexto(
-            valor = usuario,
-            onValorChange = { usuario = it },
-            label = "Usuario",
-            placeholder = "admin, estudiante, chofer",
-            keyboardType = KeyboardType.Text
+            valor = email,
+            onValorChange = { email = it },
+            label = "Correo o Usuario",
+            trailingHint = "@upt.edu.mx",
+            leadingIcon = Icons.Filled.Email,
+            keyboardType = KeyboardType.Email
         )
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
+        // Campo contraseña
         CampoTexto(
             valor = password,
             onValorChange = { password = it },
             label = "Contraseña",
-            placeholder = "••••••••",
+            leadingIcon = Icons.Filled.Lock,
             esPassword = true,
             verPassword = verPass,
             onTogglePassword = { verPass = !verPass }
         )
 
-        Spacer(Modifier.height(8.dp))
-
+        // Olvidé contraseña
         Text(
             text = "¿Olvidaste tu contraseña?",
-            color = UPTColors.DoradoClaro,
-            fontSize = 13.sp,
+            color = UPTColors.Vino,
+            fontSize = 12.sp,
             modifier = Modifier
                 .align(Alignment.End)
-                .clickable { }
+                .padding(top = 8.dp, bottom = 18.dp)
+                .clickable { /* TODO: navegar a recuperación */ }
         )
 
-        Spacer(Modifier.height(28.dp))
-
-        BotonLogin(
-            texto = "Iniciar Sesión",
+        // Botón Iniciar Sesión
+        Button(
             onClick = {
+                cargando = true
+                // Lógica de roles integrada
+                val rol = email.lowercase().trim().split("@")[0]
                 if (password == "123") {
-                    val rol = usuario.lowercase().trim()
                     if (rol == "admin" || rol == "chofer" || rol == "estudiante") {
                         onLoginSuccess(rol)
                     } else {
                         onLoginSuccess("estudiante")
                     }
+                } else {
+                    cargando = false
                 }
-            }
-        )
-    }
-}
-
-
-//  Formulario Chofer
-
-@Composable
-fun FormularioChofer(onLoginSuccess: (String) -> Unit) {
-    var usuario by remember { mutableStateOf("") }
-    var password  by remember { mutableStateOf("") }
-    var verPass   by remember { mutableStateOf(false) }
-
-    CardFormulario {
-        Text(
-            "Acceso Chofer",
-            color = UPTColors.Blanco,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        Text(
-            "Ingresa con tus credenciales",
-            color = UPTColors.BlancoSuave.copy(alpha = 0.7f),
-            fontSize = 13.sp
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        CampoTexto(
-            valor = usuario,
-            onValorChange = { usuario = it },
-            label = "Usuario",
-            placeholder = "admin, estudiante, chofer"
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        CampoTexto(
-            valor = password,
-            onValorChange = { password = it },
-            label = "Contraseña",
-            placeholder = "••••••••",
-            esPassword = true,
-            verPassword = verPass,
-            onTogglePassword = { verPass = !verPass }
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "¿Problemas de acceso? Contacta a TI",
-            color = UPTColors.DoradoClaro,
-            fontSize = 13.sp,
+            },
             modifier = Modifier
-                .align(Alignment.End)
-                .clickable { }
-        )
-
-        Spacer(Modifier.height(28.dp))
-
-        BotonLogin(
-            texto = "Ingresar",
-            onClick = {
-                if (password == "123") {
-                    val rol = usuario.lowercase().trim()
-                    if (rol == "admin" || rol == "chofer" || rol == "estudiante") {
-                        onLoginSuccess(rol)
-                    } else {
-                        onLoginSuccess("chofer")
-                    }
-                }
+                .fillMaxWidth()
+                .height(48.dp),
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(containerColor = UPTColors.Vino),
+            enabled = !cargando
+        ) {
+            if (cargando) {
+                CircularProgressIndicator(
+                    color = UPTColors.Blanco,
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text(
+                    text = "Iniciar Sesión",
+                    color = UPTColors.Blanco,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp
+                )
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = UPTColors.Blanco,
+                    modifier = Modifier.size(18.dp)
+                )
             }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        Text(
+            text = "¿No tienes cuenta? Contacta al administrador",
+            fontSize = 12.sp,
+            color = UPTColors.GrisMedio,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp)
         )
     }
 }
 
-
-//  Componentes reutilizables
-
-
-@Composable
-private fun CardFormulario(content: @Composable ColumnScope.() -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = UPTColors.Superficie),
-        elevation = CardDefaults.cardElevation(0.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            content = content
-        )
-    }
-}
-
+// ─────────────────────────────────────────────────────────────────────────────
+//  Campo de texto reutilizable
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 private fun CampoTexto(
     valor: String,
     onValorChange: (String) -> Unit,
     label: String,
-    placeholder: String,
+    trailingHint: String? = null,
+    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
     keyboardType: KeyboardType = KeyboardType.Text,
     esPassword: Boolean = false,
     verPassword: Boolean = false,
@@ -392,64 +414,86 @@ private fun CampoTexto(
         value = valor,
         onValueChange = onValorChange,
         modifier = Modifier.fillMaxWidth(),
-        label = { Text(label, color = UPTColors.BlancoSuave.copy(alpha = 0.7f)) },
-        placeholder = { Text(placeholder, color = UPTColors.BlancoSuave.copy(alpha = 0.35f)) },
+        placeholder = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label, color = Color(0xFFBBBBBB), fontSize = 13.sp)
+                if (trailingHint != null) {
+                    Spacer(Modifier.weight(1f))
+                    Text(trailingHint, color = Color(0xFFCCCCCC), fontSize = 12.sp)
+                }
+            }
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = leadingIcon,
+                contentDescription = null,
+                tint = Color(0xFFBBBBBB)
+            )
+        },
         trailingIcon = if (esPassword && onTogglePassword != null) {
             {
                 IconButton(onClick = onTogglePassword) {
-                    Text(
-                        text = if (verPassword) "Ocultar" else "Ver",
-                        color = UPTColors.BlancoSuave.copy(alpha = 0.6f),
-                        fontSize = 12.sp
+                    Icon(
+                        imageVector = if (verPassword) Icons.Filled.VisibilityOff
+                        else Icons.Filled.Visibility,
+                        contentDescription = null,
+                        tint = Color(0xFFCCCCCC)
                     )
                 }
             }
         } else null,
-        visualTransformation = if (esPassword && !verPassword) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = if (esPassword) KeyboardType.Password else keyboardType),
-        singleLine = true,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = UPTColors.Blanco,
-            unfocusedTextColor = UPTColors.Blanco,
-            focusedBorderColor = UPTColors.Dorado,
-            unfocusedBorderColor = UPTColors.BlancoSuave.copy(alpha = 0.3f),
-            cursorColor = UPTColors.Dorado,
-            focusedContainerColor = Color(0x1AFFFFFF),
-            unfocusedContainerColor = Color(0x0DFFFFFF)
+        visualTransformation = if (esPassword && !verPassword)
+            PasswordVisualTransformation()
+        else
+            VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (esPassword) KeyboardType.Password else keyboardType
         ),
-        shape = RoundedCornerShape(14.dp)
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor        = UPTColors.Negro,
+            unfocusedTextColor      = UPTColors.Negro,
+            focusedBorderColor      = UPTColors.Vino,
+            unfocusedBorderColor    = UPTColors.GrisClaro,
+            cursorColor             = UPTColors.Vino,
+            focusedContainerColor   = UPTColors.FondoInput,
+            unfocusedContainerColor = UPTColors.FondoInput
+        )
     )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Footer vino con logo UPT oficial
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
-private fun BotonLogin(
-    texto: String,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
+private fun SeccionFooter() {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-        contentPadding = PaddingValues(0.dp)
+            .background(UPTColors.Vino)
+            .padding(horizontal = 22.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(listOf(UPTColors.Dorado, UPTColors.DoradoClaro)),
-                    RoundedCornerShape(16.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
+        Icon(
+            imageVector = Icons.Default.AccountBalance,
+            contentDescription = "Logo UPT",
+            modifier = Modifier.size(38.dp),
+            tint = Color.White
+        )
+        Spacer(Modifier.width(10.dp))
+        Column {
             Text(
-                text = texto,
-                color = UPTColors.VinoOscuro,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                letterSpacing = 0.5.sp
+                text = "UPT",
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Universidad Politécnica\nde Tulancingo",
+                color = Color.White.copy(alpha = 0.82f),
+                fontSize = 9.sp,
+                lineHeight = 13.sp
             )
         }
     }
