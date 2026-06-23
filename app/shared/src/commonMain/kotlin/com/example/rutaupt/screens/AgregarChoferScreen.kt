@@ -17,26 +17,16 @@ import com.example.rutaupt.model.Chofer
 fun AgregarChoferScreen(
     onVolver: () -> Unit
 ) {
-<<<<<<< HEAD
-=======
-
->>>>>>> 02d9e061b74cb7907381fed3dc65f49648b87484
     var pantalla by remember { mutableStateOf("menu") }
     var choferAEditar by remember { mutableStateOf<Chofer?>(null) }
 
     when (pantalla) {
         "formulario" -> {
             FormularioChoferScreen(
-<<<<<<< HEAD
                 choferElegido = choferAEditar,
                 onVolver = {
                     pantalla = "menu"
-=======
-                choferEditar = choferAEditar,
-                onVolver = {
-                    pantalla = "menu"
                     choferAEditar = null
->>>>>>> 02d9e061b74cb7907381fed3dc65f49648b87484
                 }
             )
         }
@@ -46,13 +36,10 @@ fun AgregarChoferScreen(
                 onVolver = {
                     pantalla = "menu"
                 },
-<<<<<<< HEAD
                 onAgregarChofer = {
                     choferAEditar = null
                     pantalla = "formulario"
                 },
-=======
->>>>>>> 02d9e061b74cb7907381fed3dc65f49648b87484
                 onEditarChofer = { chofer ->
                     choferAEditar = chofer
                     pantalla = "formulario"

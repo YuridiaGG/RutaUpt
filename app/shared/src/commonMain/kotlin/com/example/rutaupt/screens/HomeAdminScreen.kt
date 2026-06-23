@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,40 +26,123 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.painterResource
 import com.example.rutaupt.generated.resources.*
+import com.example.rutaupt.storage.ReporteRepository
+import com.example.rutaupt.storage.SessionManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeAdminScreen(
     onGestionarChoferes: () -> Unit,
-    onGestionarHorarios: () -> Unit
+    onGestionarHorarios: () -> Unit,
+    onGestionarEstudiantes: () -> Unit,
+    onUbicacionMicros: () -> Unit,
+    onGestionarParadas: () -> Unit,
+    onConfiguracion: () -> Unit,
+    onLogout: () -> Unit,
+    onVerReportes: () -> Unit,
+    mensajeConfirmacion: String? = null,
+    onMensajeMostrado: () -> Unit = {}
 ) {
     val vinoUpt = UPTColors.Vino
     val vinoOscuro = UPTColors.VinoOscuro
+    var showMenu by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
+    var notificationsRead by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(mensajeConfirmacion) {
+        mensajeConfirmacion?.let {
+            snackbarHostState.showSnackbar(it)
+            onMensajeMostrado()
+        }
+    }
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Admin", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp) },
-                navigationIcon = {
-                    IconButton(onClick = { }) {
-                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
-                    }
-                },
+                title = { Text("Administrador", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 actions = {
-                    IconButton(onClick = { }) {
-                        Box {
-                            Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .background(Color.Red, CircleShape)
-                                    .align(Alignment.TopEnd)
-                                    .offset(x = (-2).dp, y = 2.dp)
+                    Box {
+                        IconButton(onClick = { 
+                            showNotifications = true 
+                            notificationsRead = true
+                        }) {
+                            BadgedBox(
+                                badge = { 
+                                    if (ReporteRepository.reportes.isNotEmpty() && !notificationsRead) {
+                                        Badge { Text(ReporteRepository.reportes.size.toString()) }
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = showNotifications,
+                            onDismissRequest = { showNotifications = false },
+                            modifier = Modifier.width(300.dp).background(Color.White)
+                        ) {
+                            Text(
+                                "Reportes en Tiempo Real",
+                                modifier = Modifier.padding(16.dp),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                color = Color.Black
+                            )
+                            HorizontalDivider(color = Color(0xFFF0F0F0))
+                            
+                            if (ReporteRepository.reportes.isEmpty()) {
+                                Text("No hay reportes nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
+                            } else {
+                                ReporteRepository.reportes.take(5).forEach { reporte ->
+                                    RecentNotificationItem(
+                                        reporte.mensaje, 
+                                        reporte.tiempo, 
+                                        if(reporte.tipo == ReporteTipo.ALERTA) Color.Red else Color(0xFFF39C12), 
+                                        if(reporte.tipo == ReporteTipo.ALERTA) Icons.Default.Warning else Icons.Default.BusAlert
+                                    )
+                                }
+                            }
+                            
+                            TextButton(
+                                onClick = { showNotifications = false },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Cerrar", color = vinoUpt)
+                            }
+                        }
+                    }
+                    
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.Settings, contentDescription = "Configuración", tint = Color.White)
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            modifier = Modifier.background(Color.White)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Mi Perfil", fontWeight = FontWeight.Medium) },
+                                onClick = {
+                                    showMenu = false
+                                    onConfiguracion()
+                                },
+                                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = vinoUpt) }
+                            )
+                            HorizontalDivider(color = Color(0xFFF0F0F0))
+                            DropdownMenuItem(
+                                text = { Text("Cerrar Sesión", color = Color.Red, fontWeight = FontWeight.Medium) },
+                                onClick = {
+                                    showMenu = false
+                                    SessionManager.cerrarSesion()
+                                    onLogout()
+                                },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = Color.Red) }
                             )
                         }
                     }
@@ -70,28 +153,33 @@ fun HomeAdminScreen(
         bottomBar = {
             NavigationBar(containerColor = Color.White, modifier = Modifier.shadow(8.dp)) {
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Inicio") },
+                    label = { Text("Inicio", fontSize = 10.sp) },
                     selected = true,
                     onClick = {},
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = vinoUpt, indicatorColor = vinoUpt.copy(alpha = 0.1f))
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.DirectionsBus, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Map, contentDescription = "Ubicación Micros") },
+                    label = { Text("Ubicación", fontSize = 10.sp) },
                     selected = false,
-                    onClick = {}
+                    onClick = onUbicacionMicros
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                    icon = { Icon(Icons.Default.DirectionsBus, contentDescription = "Reportes") },
+                    label = { Text("Reportes", fontSize = 10.sp) },
                     selected = false,
-                    onClick = {}
+                    onClick = onVerReportes
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    icon = { Icon(Icons.Default.AddLocationAlt, contentDescription = "Paradas") },
+                    label = { Text("Paradas", fontSize = 10.sp) },
                     selected = false,
-                    onClick = {}
+                    onClick = onGestionarParadas
                 )
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -100,7 +188,6 @@ fun HomeAdminScreen(
                 .background(Color(0xFFF5F5F5))
                 .verticalScroll(rememberScrollState())
         ) {
-            // --- HEADER VINO CON MASCOTA ---
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -123,9 +210,9 @@ fun HomeAdminScreen(
                             fontWeight = FontWeight.Medium
                         )
                         Text(
-                            "Administrador!",
+                            "${SessionManager.nombreUsuario}!",
                             color = Color.White,
-                            fontSize = 19.sp, // Tamaño reducido para que no se corte
+                            fontSize = 19.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
@@ -141,42 +228,41 @@ fun HomeAdminScreen(
             }
 
             Column(modifier = Modifier.padding(20.dp)) {
-                // --- SECCIÓN 1: Resumen General ---
                 SectionHeader("Resumen General")
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     StatCard("1,248", "Estudiantes registrados", Icons.Default.Group, Modifier.weight(1f))
-                    StatCard("56", "Choferes activos", Icons.Default.Badge, Modifier.weight(1f))
+                    StatCard("${com.example.rutaupt.storage.ChoferRepository.choferes.size}", "Choferes registrados", Icons.Default.Badge, Modifier.weight(1f))
                 }
                 Spacer(modifier = Modifier.height(14.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     StatCard("18", "Rutas activas", Icons.Default.DirectionsBus, Modifier.weight(1f))
-                    StatCard("23", "Reportes pendientes", Icons.Default.Warning, Modifier.weight(1f), iconColor = Color(0xFFE74C3C))
+                    StatCard("${ReporteRepository.reportes.size}", "Reportes totales", Icons.Default.Warning, Modifier.weight(1f), iconColor = Color(0xFFE74C3C))
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // --- SECCIÓN 2: Accesos Rápidos ---
                 SectionHeader("Accesos rápidos")
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    // "Gestionar Rutas" ELIMINADO según solicitud
                     QuickActionCard("Gestionar Horarios", Icons.Default.Schedule, Modifier.weight(1f), onClick = onGestionarHorarios)
                     QuickActionCard("Gestionar Choferes", Icons.Default.Person, Modifier.weight(1f), onClick = onGestionarChoferes)
                 }
                 Spacer(modifier = Modifier.height(14.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    QuickActionCard("Gestionar Estudiantes", Icons.Default.School, Modifier.weight(1f))
-                    // Espacio vacío para mantener el grid
-                    Box(modifier = Modifier.weight(1f))
-                }
+                
+                QuickActionCard(
+                    title = "Gestionar Estudiantes",
+                    icon = Icons.Default.School,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onGestionarEstudiantes
+                )
+
                 Spacer(modifier = Modifier.height(20.dp))
                 
-                // Botón Ver Reportes
                 Button(
-                    onClick = {},
+                    onClick = onVerReportes,
                     modifier = Modifier.fillMaxWidth().height(58.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
@@ -188,32 +274,10 @@ fun HomeAdminScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // --- SECCIÓN 3: Actividad Semanal ---
                 SectionHeader("Actividad semanal")
                 Spacer(modifier = Modifier.height(16.dp))
                 ActivityChart()
 
-                Spacer(modifier = Modifier.height(32.dp))
-
-                // --- SECCIÓN 4: Notificaciones ---
-                SectionHeader("Notificaciones recientes")
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                RecentNotificationItem("Reporte de ruta 05: Unidad llena", "Hace 10 minutos", Color(0xFFF39C12), Icons.Default.BusAlert)
-                RecentNotificationItem("Nueva ruta 18 creada", "Hace 1 hora", Color(0xFF27AE60), Icons.Default.AddLocation)
-                RecentNotificationItem("Chofer Luis ha completado su ruta", "Hace 2 horas", Color(0xFF2980B9), Icons.Default.CheckCircle)
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    "Ver todas las notificaciones",
-                    color = vinoUpt,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.fillMaxWidth().clickable { }.padding(8.dp)
-                )
-                
                 Spacer(modifier = Modifier.height(30.dp))
             }
         }
@@ -270,32 +334,26 @@ private fun QuickActionCard(title: String, icon: ImageVector, modifier: Modifier
 @Composable
 private fun RecentNotificationItem(title: String, time: String, iconBg: Color, icon: ImageVector) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
-                modifier = Modifier.size(46.dp).background(iconBg.copy(alpha = 0.12f), CircleShape),
+                modifier = Modifier.size(40.dp).background(iconBg.copy(alpha = 0.12f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(icon, contentDescription = null, tint = iconBg, modifier = Modifier.size(22.dp))
+                Icon(icon, contentDescription = null, tint = iconBg, modifier = Modifier.size(20.dp))
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Black)
-                Text(time, fontSize = 12.sp, color = Color.Gray)
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.Black)
+                Text(time, fontSize = 11.sp, color = Color.Gray)
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = Color.LightGray
-            )
         }
     }
 }
@@ -325,14 +383,12 @@ private fun ActivityChart() {
                     if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
 
-                // Línea del gráfico
                 drawPath(
                     path = path,
                     color = vinoUpt,
                     style = Stroke(width = 4.dp.toPx())
                 )
 
-                // Puntos decorativos
                 chartData.forEachIndexed { index, value ->
                     val x = index * spacing
                     val y = height - (value * height)

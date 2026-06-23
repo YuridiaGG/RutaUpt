@@ -1,7 +1,10 @@
 package com.example.rutaupt.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class Chofer(
-    val id: Int,
+    val id: Int? = null,
     val nombre: String,
     val apellidos: String,
     val edad: String,
