@@ -10,6 +10,7 @@ version = "1.0.0"
 application {
     mainClass.set("com.example.rutaupt.ApplicationKt")
 }
+
 tasks.jar {
     manifest {
         attributes["Main-Class"] = "com.example.rutaupt.ApplicationKt"
@@ -37,6 +38,9 @@ dependencies {
     implementation(libs.exposed.kotlin.datetime)
     implementation(libs.hikaricp)
     implementation(libs.mysql.connector)
+    
+    // Email service
+    implementation(libs.jakarta.mail)
 
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)

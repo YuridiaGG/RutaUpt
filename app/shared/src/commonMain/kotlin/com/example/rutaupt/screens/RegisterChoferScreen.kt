@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -18,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rutaupt.getPlatform
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.api.AuthApiService
+import com.example.rutaupt.model.User
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,20 +38,25 @@ fun RegisterChoferScreen(
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
 
     val vinoUpt = UPTColors.Vino
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val authService = remember { AuthApiService() }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Registro Chofer", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, enabled = !isLoading) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Regresar")
                     }
                 }
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -70,7 +79,8 @@ fun RegisterChoferScreen(
                 onValueChange = { nombre = it },
                 label = { Text("Nombre(s)") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             OutlinedTextField(
@@ -78,23 +88,26 @@ fun RegisterChoferScreen(
                 onValueChange = { apellidos = it },
                 label = { Text("Apellidos") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = edad,
-                    onValueChange = { edad = it },
+                    onValueChange = { if(it.length <= 3) edad = it },
                     label = { Text("Edad") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isLoading
                 )
                 OutlinedTextField(
                     value = numeroUnidad,
                     onValueChange = { numeroUnidad = it },
                     label = { Text("N° Unidad") },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.weight(1.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isLoading
                 )
             }
 
@@ -104,7 +117,8 @@ fun RegisterChoferScreen(
                 label = { Text("Número de Teléfono") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Phone, null) },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             OutlinedTextField(
@@ -113,7 +127,8 @@ fun RegisterChoferScreen(
                 label = { Text("Correo Electrónico") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Email, null) },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             OutlinedTextField(
@@ -131,7 +146,8 @@ fun RegisterChoferScreen(
                     }
                 },
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             OutlinedTextField(
@@ -141,24 +157,56 @@ fun RegisterChoferScreen(
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 visualTransformation = PasswordVisualTransformation(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
-                    if (nombre.isNotBlank()) {
-                        SessionManager.iniciarSesion(nombre, email, "chofer")
-                        getPlatform().showNotification("RutaUPT", "¡Bienvenido(a) Chofer $nombre!")
+                    if (nombre.isBlank() || email.isBlank() || password.isBlank() || numeroUnidad.isBlank()) {
+                        scope.launch { snackbarHostState.showSnackbar("Complete todos los campos obligatorios") }
+                        return@Button
                     }
-                    onRegisterSuccess()
+                    if (password != confirmPassword) {
+                        scope.launch { snackbarHostState.showSnackbar("Las contraseñas no coinciden") }
+                        return@Button
+                    }
+
+                    isLoading = true
+                    scope.launch {
+                        val user = User(
+                            nombre = nombre.trim(),
+                            apellidos = apellidos.trim(),
+                            email = email.lowercase().trim(),
+                            password = password,
+                            rol = "chofer",
+                            numeroUnidad = numeroUnidad.trim().uppercase(),
+                            edad = edad.trim(),
+                            telefono = telefono.trim()
+                        )
+                        val response = authService.register(user)
+                        isLoading = false
+                        if (response.success) {
+                            SessionManager.iniciarSesion(nombre, email, "chofer")
+                            getPlatform().showNotification("RutaUPT", "¡Bienvenido Chofer $nombre!")
+                            onRegisterSuccess()
+                        } else {
+                            snackbarHostState.showSnackbar(response.message)
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(28.dp),
+                enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
             ) {
-                Text("Registrar Unidad", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                if (isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Registrar Chofer", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

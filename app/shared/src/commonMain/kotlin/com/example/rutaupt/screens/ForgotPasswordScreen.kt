@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.example.rutaupt.generated.resources.Res
 import com.example.rutaupt.generated.resources.imagentoro
 import com.example.rutaupt.getPlatform
+import com.example.rutaupt.api.AuthApiService
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
@@ -32,16 +33,19 @@ fun ForgotPasswordScreen(
 ) {
     var email by remember { mutableStateOf("") }
     var confirmEmail by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    
     val vinoUpt = UPTColors.Vino
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val authService = remember { AuthApiService() }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Recuperación", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, enabled = !isLoading) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
@@ -62,18 +66,12 @@ fun ForgotPasswordScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp)
-            ) {
-                Image(
-                    painter = painterResource(Res.drawable.imagentoro),
-                    contentDescription = "Toro UPT",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
+            Image(
+                painter = painterResource(Res.drawable.imagentoro),
+                contentDescription = "Toro UPT",
+                modifier = Modifier.fillMaxWidth(),
+                contentScale = ContentScale.FillWidth
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -93,7 +91,7 @@ fun ForgotPasswordScreen(
                 )
 
                 Text(
-                    "Ingresa el correo electrónico institucional que utilizaste al registrarte. Te enviaremos tus credenciales de acceso.",
+                    "Ingresa tu correo institucional. Te enviaremos tus credenciales de acceso registradas en el sistema.",
                     fontSize = 14.sp,
                     color = Color.Gray,
                     lineHeight = 20.sp,
@@ -109,6 +107,7 @@ fun ForgotPasswordScreen(
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = vinoUpt) },
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true,
+                    enabled = !isLoading,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = vinoUpt,
                         focusedLabelColor = vinoUpt,
@@ -125,6 +124,7 @@ fun ForgotPasswordScreen(
                     leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = vinoUpt) },
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true,
+                    enabled = !isLoading,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = vinoUpt,
                         focusedLabelColor = vinoUpt,
@@ -137,47 +137,25 @@ fun ForgotPasswordScreen(
                 Button(
                     onClick = {
                         if (email.isBlank() || confirmEmail.isBlank()) {
-                            scope.launch {
-                                snackbarHostState.showSnackbar("Por favor complete todos los campos")
-                            }
-                        } else if (email != confirmEmail) {
-                            scope.launch {
-                                snackbarHostState.showSnackbar("Los correos electrónicos no coinciden")
-                            }
-                        } else {
-                            // Simulamos el envío del correo con el formato solicitado
-                            val mensajeCompleto = """
-                                Asunto: Recuperación de contraseña – RutaUPT
+                            scope.launch { snackbarHostState.showSnackbar("Por favor complete todos los campos") }
+                            return@Button
+                        }
+                        if (email.trim().lowercase() != confirmEmail.trim().lowercase()) {
+                            scope.launch { snackbarHostState.showSnackbar("Los correos electrónicos no coinciden") }
+                            return@Button
+                        }
 
-                                Estimado(a) usuario(a) de RutaUPT:
-
-                                Reciba un cordial saludo.
-
-                                Hemos recibido y procesado correctamente su solicitud de recuperación de contraseña. A continuación, se muestran los datos de acceso asociados a su cuenta:
-
-                                Correo electrónico: $email
-                                Contraseña: ********
-
-                                Por motivos de seguridad, le recomendamos cambiar su contraseña después de iniciar sesión. Puede hacerlo fácilmente desde la sección "Mi Perfil" dentro de la aplicación RutaUPT, donde encontrará la opción "Cambiar contraseña" para actualizar sus credenciales de forma segura.
-
-                                Si usted no realizó esta solicitud de recuperación, le recomendamos comunicarse con el equipo de soporte de RutaUPT lo antes posible para proteger su cuenta.
-
-                                Agradecemos su confianza en RutaUPT.
-
-                                Atentamente,
-
-                                Equipo de Desarrollo
-                                RutaUPT
-                                Universidad Politécnica de Tulancingo
-                            """.trimIndent()
-                            
-                            // Mostramos notificación y log
-                            getPlatform().showNotification("RutaUPT", "Correo de recuperación enviado a $email")
-                            println(mensajeCompleto)
-                            
-                            scope.launch {
-                                snackbarHostState.showSnackbar("Correo enviado con éxito")
-                                onBack() // Regresamos al login
+                        isLoading = true
+                        scope.launch {
+                            val response = authService.recoverPassword(email.trim().lowercase())
+                            isLoading = false
+                            if (response.success) {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Credenciales enviadas a tu correo")
+                                    onBack()
+                                }
+                            } else {
+                                snackbarHostState.showSnackbar(response.message)
                             }
                         }
                     },
@@ -185,9 +163,14 @@ fun ForgotPasswordScreen(
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = RoundedCornerShape(28.dp),
+                    enabled = !isLoading,
                     colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
                 ) {
-                    Text("Enviar Contraseña", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Enviar Contraseña", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
                 }
             }
         }

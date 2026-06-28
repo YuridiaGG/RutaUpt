@@ -31,7 +31,8 @@ import org.jetbrains.compose.resources.painterResource
 import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.getPlatform
 import com.example.rutaupt.storage.SessionManager
-import com.example.rutaupt.storage.ChoferRepository
+import com.example.rutaupt.api.AuthApiService
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
@@ -42,65 +43,70 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
+    
     val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val authService = remember { AuthApiService() }
 
     val vinoUpt = UPTColors.Vino
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.White
     ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
                 .imePadding()
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Imagen Inicial
+            Spacer(modifier = Modifier.height(paddingValues.calculateTopPadding() + 20.dp))
+
             Image(
                 painter = painterResource(Res.drawable.imagentoro),
                 contentDescription = "Toro UPT",
-                modifier = Modifier
-                    .fillMaxWidth() // Elimina el marco lateral
-                    .padding(top = 30.dp), // Espacio superior elegante
-                contentScale = ContentScale.FillWidth // Imagen completa que llena el ancho
+                modifier = Modifier.fillMaxWidth(),
+                contentScale = ContentScale.FillWidth
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text = buildAnnotatedString {
-                    append("Bienvenido a ")
-                    withStyle(style = SpanStyle(color = vinoUpt, fontWeight = FontWeight.Bold)) {
-                        append("RutaUPT")
-                    }
-                },
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-            Text(
-                text = "Inicia sesión para continuar",
-                color = Color.Gray,
-                fontSize = 15.sp
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 30.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Text(
+                    text = buildAnnotatedString {
+                        append("Bienvenido a ")
+                        withStyle(style = SpanStyle(color = vinoUpt, fontWeight = FontWeight.Bold)) {
+                            append("RutaUPT")
+                        }
+                    },
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                Text(
+                    text = "Inicia sesión para continuar",
+                    color = Color.Gray,
+                    fontSize = 15.sp
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Usuario / Correo") },
-                    placeholder = { Text("Ej: admin") },
+                    placeholder = { Text("Ej: admin@upt.edu.mx") },
                     leadingIcon = { Icon(Icons.Default.Person, null, tint = vinoUpt) },
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true,
+                    enabled = !isLoading,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Email,
                         imeAction = ImeAction.Next
@@ -117,6 +123,8 @@ fun LoginScreen(
                     )
                 )
 
+                Spacer(modifier = Modifier.height(16.dp))
+
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
@@ -132,6 +140,7 @@ fun LoginScreen(
                             )
                         }
                     },
+                    enabled = !isLoading,
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Password,
@@ -150,94 +159,80 @@ fun LoginScreen(
                         cursorColor = vinoUpt
                     )
                 )
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Text(
-                text = "¿Olvidaste tu contraseña?",
-                color = vinoUpt,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clickable { onForgotPasswordClick() }
-            )
+                Text(
+                    text = "¿Olvidaste tu contraseña?",
+                    color = vinoUpt,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable(enabled = !isLoading) { onForgotPasswordClick() }
+                )
 
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
-            Button(
-                onClick = {
-                    val user = email.lowercase().trim()
-                    val pass = password.trim()
-                    
-                    val choferEncontrado = ChoferRepository.choferes.find { 
-                        it.email.lowercase().trim() == user && it.contrasena == pass 
+                Button(
+                    onClick = {
+                        if (email.isBlank() || password.isBlank()) {
+                            scope.launch { snackbarHostState.showSnackbar("Ingresa tus credenciales") }
+                            return@Button
+                        }
+                        
+                        isLoading = true
+                        scope.launch {
+                            val response = authService.login(email.lowercase().trim(), password.trim())
+                            isLoading = false
+                            
+                            if (response.success && response.user != null) {
+                                // CORRECCIÓN DE NULABILIDAD: Uso de ?.let para desempaquetado seguro
+                                response.user?.let { user ->
+                                    SessionManager.iniciarSesion("${user.nombre} ${user.apellidos}", user.email, user.rol)
+                                    getPlatform().showNotification("RutaUPT", "¡Hola ${user.nombre}!")
+                                    onLoginSuccess(user.rol.lowercase())
+                                }
+                            } else {
+                                snackbarHostState.showSnackbar(response.message)
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    enabled = !isLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Iniciar Sesión",
+                                modifier = Modifier.align(Alignment.Center),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.align(Alignment.CenterEnd)
+                            )
+                        }
                     }
-
-                    val target = when {
-                        choferEncontrado != null -> {
-                            SessionManager.iniciarSesion("${choferEncontrado.nombre} ${choferEncontrado.apellidos}", email, "chofer")
-                            "chofer"
-                        }
-                        user == "admin" && pass == "123" -> {
-                            SessionManager.iniciarSesion("Administrador", email, "admin")
-                            "admin"
-                        }
-                        user == "chofer" && pass == "123" -> {
-                            SessionManager.iniciarSesion("Chofer Demo", email, "chofer")
-                            "chofer"
-                        }
-                        user == "estudiante" && pass == "123" -> {
-                            SessionManager.iniciarSesion("Estudiante Demo", email, "estudiante")
-                            "estudiante"
-                        }
-                        user.contains("admin") -> {
-                            SessionManager.iniciarSesion("Admin " + user.substringBefore("@"), email, "admin")
-                            "admin"
-                        }
-                        user.contains("chofer") -> {
-                            SessionManager.iniciarSesion("Chofer " + user.substringBefore("@"), email, "chofer")
-                            "chofer"
-                        }
-                        else -> {
-                            SessionManager.iniciarSesion(user.substringBefore("@").replaceFirstChar { it.uppercase() }, email, "estudiante")
-                            "estudiante"
-                        }
-                    }
-                    
-                    getPlatform().showNotification("RutaUPT", "¡Bienvenido/a ${SessionManager.nombreUsuario}!")
-                    onLoginSuccess(target)
-                },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 30.dp).height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
-            ) {
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Iniciar Sesión",
-                        modifier = Modifier.align(Alignment.Center),
-                        fontWeight = FontWeight.Bold
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        modifier = Modifier.align(Alignment.CenterEnd)
-                    )
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = buildAnnotatedString {
+                        append("¿Nuevo en RutaUPT? ")
+                        withStyle(style = SpanStyle(color = vinoUpt, fontWeight = FontWeight.Bold)) {
+                            append("Crea una cuenta")
+                        }
+                    },
+                    fontSize = 14.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.clickable(enabled = !isLoading) { onRegisterClick() }
+                )
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = buildAnnotatedString {
-                    append("¿Nuevo en RutaUPT? ")
-                    withStyle(style = SpanStyle(color = vinoUpt, fontWeight = FontWeight.Bold)) {
-                        append("Crea una cuenta")
-                    }
-                },
-                fontSize = 14.sp,
-                color = Color.Gray,
-                modifier = Modifier.clickable { onRegisterClick() }
-            )
 
             Spacer(modifier = Modifier.height(60.dp))
 

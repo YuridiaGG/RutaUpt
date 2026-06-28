@@ -9,29 +9,34 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 
 class RutaApiService {
-    private val baseUrl = "https://rutaupt-production.up.railway.app/api"
+
+    companion object {
+        private const val BASE_URL = "https://rutaupt-production.up.railway.app"
+    }
 
     private val client = HttpClient {
         install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true // Ignora campos extras que envíe el servidor
-                prettyPrint = true
-                isLenient = true
-            })
+            json(
+                Json {
+                    ignoreUnknownKeys = true
+                    prettyPrint = true
+                    isLenient = true
+                }
+            )
         }
     }
 
     /**
-     * Obtiene las rutas reales desde el backend en Railway.
+     * Obtiene las rutas desde el backend en Railway
      */
     suspend fun obtenerRutas(): List<Route> {
         return try {
-            client.get("$baseUrl/rutas").body()
+            client.get("$BASE_URL/api/rutas").body()
         } catch (e: Exception) {
             println("Error al conectar con la API: ${e.message}")
-            emptyList() // Devuelve lista vacía en caso de error
+            emptyList()
         }
     }
-    
-    fun getBaseUrl() = baseUrl
+
+    fun getBaseUrl() = BASE_URL
 }
