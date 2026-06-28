@@ -3,6 +3,7 @@ package com.example.rutaupt.screens
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -30,6 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.painterResource
 import com.example.rutaupt.generated.resources.*
+import com.example.rutaupt.rememberBitmapFromBase64
+import com.example.rutaupt.model.ReporteUnidad
+import com.example.rutaupt.model.ReporteTipo
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
 
@@ -86,33 +91,57 @@ fun HomeAdminScreen(
                             onDismissRequest = { showNotifications = false },
                             modifier = Modifier.width(300.dp).background(Color.White)
                         ) {
-                            Text(
-                                "Reportes en Tiempo Real",
-                                modifier = Modifier.padding(16.dp),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = Color.Black
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "Avisos Recientes",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = Color.Black
+                                )
+                                if (ReporteRepository.reportes.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { ReporteRepository.limpiarReportes() },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.DeleteSweep, contentDescription = "Limpiar todo", tint = Color.Gray)
+                                    }
+                                }
+                            }
                             HorizontalDivider(color = Color(0xFFF0F0F0))
                             
                             if (ReporteRepository.reportes.isEmpty()) {
-                                Text("No hay reportes nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
+                                Text("No hay avisos nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
                             } else {
                                 ReporteRepository.reportes.take(5).forEach { reporte ->
                                     RecentNotificationItem(
-                                        reporte.mensaje, 
-                                        reporte.tiempo, 
-                                        if(reporte.tipo == ReporteTipo.ALERTA) Color.Red else Color(0xFFF39C12), 
-                                        if(reporte.tipo == ReporteTipo.ALERTA) Icons.Default.Warning else Icons.Default.BusAlert
+                                        mensaje = reporte.mensaje, 
+                                        tiempo = reporte.tiempo, 
+                                        iconBg = if(reporte.tipo == ReporteTipo.ALERTA) Color.Red else Color(0xFFF39C12), 
+                                        icon = if(reporte.tipo == ReporteTipo.ALERTA) Icons.Default.Warning else Icons.Default.BusAlert,
+                                        imagenBase64 = reporte.imagen,
+                                        onClick = {
+                                            showNotifications = false
+                                            onVerReportes()
+                                        },
+                                        onDelete = {
+                                            ReporteRepository.eliminarReporte(reporte.id)
+                                        }
                                     )
                                 }
                             }
                             
                             TextButton(
-                                onClick = { showNotifications = false },
+                                onClick = { 
+                                    showNotifications = false
+                                    onVerReportes()
+                                },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Cerrar", color = vinoUpt)
+                                Text("Ver todos los reportes", color = vinoUpt)
                             }
                         }
                     }
@@ -269,7 +298,7 @@ fun HomeAdminScreen(
                 ) {
                     Icon(Icons.Default.Assessment, contentDescription = null, tint = Color.White)
                     Spacer(Modifier.width(12.dp))
-                    Text("Ver Reportes", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    Text("Ver Reportes de Unidades", fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -332,27 +361,70 @@ private fun QuickActionCard(title: String, icon: ImageVector, modifier: Modifier
 }
 
 @Composable
-private fun RecentNotificationItem(title: String, time: String, iconBg: Color, icon: ImageVector) {
+private fun RecentNotificationItem(
+    mensaje: String, 
+    tiempo: String, 
+    iconBg: Color, 
+    icon: ImageVector,
+    imagenBase64: String? = null,
+    onClick: () -> Unit,
+    onDelete: () -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier.size(40.dp).background(iconBg.copy(alpha = 0.12f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = iconBg, modifier = Modifier.size(20.dp))
+            if (!imagenBase64.isNullOrEmpty()) {
+                val bitmap = rememberBitmapFromBase64(imagenBase64)
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = "Miniatura",
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier.size(42.dp).background(iconBg.copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(icon, contentDescription = null, tint = iconBg, modifier = Modifier.size(20.dp))
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier.size(42.dp).background(iconBg.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = iconBg, modifier = Modifier.size(20.dp))
+                }
             }
+            
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.Black)
-                Text(time, fontSize = 11.sp, color = Color.Gray)
+                Text(mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black, maxLines = 1)
+                Text(tiempo, fontSize = 10.sp, color = Color.Gray)
+            }
+            Row {
+                if (!imagenBase64.isNullOrEmpty()) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.Gray.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(8.dp))
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
+                }
             }
         }
     }

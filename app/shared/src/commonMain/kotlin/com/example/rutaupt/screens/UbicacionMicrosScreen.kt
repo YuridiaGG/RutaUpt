@@ -102,30 +102,28 @@ fun ListaUnidadesActivas(padding: PaddingValues, onSelect: (String) -> Unit) {
 @Composable
 fun MapaTiempoReal(padding: PaddingValues, unidad: String) {
     Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-        Box(modifier = Modifier.fillMaxSize().background(Color(0xFFE0E0E0)), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Map, modifier = Modifier.size(100.dp), tint = Color.Gray, contentDescription = "Mapa")
-                Text("Simulación de Mapa en Tiempo Real", color = Color.Gray)
-                Text("Unidad $unidad moviéndose...", fontWeight = FontWeight.Bold)
-            }
-        }
-        
-        Icon(
-            Icons.Default.DirectionsBus,
-            contentDescription = "Bus",
-            tint = UPTColors.Vino,
-            modifier = Modifier.size(40.dp).align(Alignment.Center).offset(y = (-20).dp)
+        // Mapa real integrado aquí
+        MapComponent(
+            modifier = Modifier.fillMaxSize(),
+            latitude = 20.0845, // Ubicación simulada para demo
+            longitude = -98.3695,
+            title = "Unidad $unidad"
         )
         
         Card(
             modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp).fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Información de la Unidad", fontWeight = FontWeight.Bold)
-                Text("Velocidad: 35 km/h")
-                Text("Próxima parada: Parada La Joya")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(8.dp).background(Color(0xFF4CAF50), CircleShape))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Unidad $unidad", fontWeight = FontWeight.Bold)
+                }
+                Text("Estado: En movimiento", fontSize = 14.sp, color = Color.Gray)
+                Text("Velocidad: 35 km/h", fontSize = 14.sp, color = Color.Gray)
+                Text("Próxima parada: Parada La Joya", fontSize = 14.sp, color = Color.Gray)
             }
         }
     }

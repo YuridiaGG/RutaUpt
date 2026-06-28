@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import com.example.rutaupt.TrackingService
 import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.getPlatform
+import com.example.rutaupt.model.ReporteUnidad
+import com.example.rutaupt.model.ReporteTipo
 import com.example.rutaupt.storage.ChoferRepository
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
@@ -55,7 +57,6 @@ fun HomeEstudianteScreen(
     
     var showNotifications by remember { mutableStateOf(false) }
     
-    // Lógica para que el badge desaparezca al picarle
     var lastSeenNotificationCount by remember { mutableStateOf(0) }
     val currentNotificationCount = ReporteRepository.reportes.size
     val hasNewNotifications = currentNotificationCount > lastSeenNotificationCount
@@ -91,7 +92,21 @@ fun HomeEstudianteScreen(
                             onDismissRequest = { showNotifications = false },
                             modifier = Modifier.width(280.dp).background(Color.White)
                         ) {
-                            Text("Avisos de Ruta", modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Avisos de Ruta", fontWeight = FontWeight.Bold)
+                                if (ReporteRepository.reportes.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { ReporteRepository.limpiarReportes() },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.DeleteSweep, contentDescription = "Limpiar todo", tint = Color.Gray)
+                                    }
+                                }
+                            }
                             HorizontalDivider()
                             if (ReporteRepository.reportes.isEmpty()) {
                                 Text("No hay avisos nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
@@ -105,7 +120,12 @@ fun HomeEstudianteScreen(
                                             }
                                         },
                                         onClick = { showNotifications = false },
-                                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = vinoUpt) }
+                                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = vinoUpt) },
+                                        trailingIcon = {
+                                            IconButton(onClick = { ReporteRepository.eliminarReporte(reporte.id) }) {
+                                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -153,8 +173,12 @@ fun HomeEstudianteScreen(
                     "Inicio" -> InicioSection(vinoUpt, vinoOscuro, onNavigateToRuta) { mensaje ->
                         if (SessionManager.puedeEnviarReporte()) {
                             scope.launch {
-                                // AVISO ANÓNIMO: Se añade el prefijo "Anónimo: "
-                                val nuevoReporte = ReporteUnidad("UPT-05", "Anónimo: $mensaje", "Ahora", ReporteTipo.INFORMACION)
+                                val nuevoReporte = ReporteUnidad(
+                                    unidad = "UPT-05",
+                                    mensaje = "Anónimo: $mensaje",
+                                    tiempo = "Ahora",
+                                    tipo = ReporteTipo.INFORMACION
+                                )
                                 ReporteRepository.agregarReporte(nuevoReporte)
                                 getPlatform().showNotification("Reporte Recibido", "Un estudiante avisó: $mensaje")
                                 SessionManager.registrarEnvioReporte()
@@ -177,11 +201,9 @@ fun HomeEstudianteScreen(
 fun InicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: () -> Unit, onSendReport: (String) -> Unit) {
     val trackingService = remember { TrackingService() }
     
-    // Ubicación simulada del usuario
     val userLat = 20.0820
     val userLon = -98.3680
 
-    // Simulación de micros en movimiento
     val unidadesMock = remember {
         mutableStateListOf(
             Triple("UPT-01", 20.0810, -98.3660),
@@ -194,10 +216,8 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: () -> Uni
     var unidadMasCercana by remember { mutableStateOf(unidadesMock[0]) }
     var tiempoEstimado by remember { mutableStateOf(5) }
 
-    // Efecto para que la card cambie dinámicamente según la micro más cercana
     LaunchedEffect(Unit) {
         while(true) {
-            // Simular movimiento aleatorio
             for (i in unidadesMock.indices) {
                 val u = unidadesMock[i]
                 unidadesMock[i] = u.copy(
@@ -206,7 +226,6 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: () -> Uni
                 )
             }
             
-            // Encontrar la más cercana por distancia Manhattan (lat + lon)
             unidadMasCercana = unidadesMock.minBy { (_, lat, lon) ->
                 abs(lat - userLat) + abs(lon - userLon)
             }
@@ -234,7 +253,6 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: () -> Uni
                 modifier = Modifier.fillMaxSize()
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    // FORMATO: "¡Hola, " normal, Nombre en Negrita
                     Text(
                         text = buildAnnotatedString {
                             append("¡Hola, ")
@@ -259,7 +277,6 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: () -> Uni
 
         Column(modifier = Modifier.padding(16.dp)) {
             SectionTitle("Mi ruta")
-            // CARD DINÁMICA: Cambia según la micro más cercana simulada
             Card(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -305,56 +322,33 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: () -> Uni
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp)
+                    .height(250.dp)
                     .padding(vertical = 8.dp)
                     .clickable { onNavigateToRuta() },
                 shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(4.dp)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFE8E8E8)))
+                    MapComponent(
+                        modifier = Modifier.fillMaxSize(),
+                        latitude = unidadMasCercana.second,
+                        longitude = unidadMasCercana.third,
+                        title = "Unidad ${unidadMasCercana.first}"
+                    )
                     
-                    Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                        Surface(
-                            color = Color.White,
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier.shadow(2.dp, RoundedCornerShape(20.dp))
+                    Surface(
+                        color = Color.White.copy(alpha = 0.9f),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.padding(12.dp).align(Alignment.TopStart).shadow(2.dp, RoundedCornerShape(20.dp))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(modifier = Modifier.size(8.dp).background(Color(0xFF4CAF50), CircleShape))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Micro ${unidadMasCercana.first} detectada", fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                            }
+                            Box(modifier = Modifier.size(8.dp).background(Color(0xFF4CAF50), CircleShape))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Micro ${unidadMasCercana.first} en vivo", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                         }
-                        
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Default.DirectionsBus, 
-                                contentDescription = null, 
-                                tint = vinoUpt, 
-                                modifier = Modifier.size(36.dp).offset(x = 30.dp, y = (-20).dp)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .background(Color(0xFF2196F3).copy(alpha = 0.2f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(modifier = Modifier.size(12.dp).background(Color.White, CircleShape), contentAlignment = Alignment.Center) {
-                                    Box(modifier = Modifier.size(8.dp).background(Color(0xFF2196F3), CircleShape))
-                                }
-                            }
-                        }
-                        
-                        Text(
-                            "Ver mapa completo", 
-                            fontSize = 10.sp, 
-                            color = Color.Gray.copy(alpha = 0.6f), 
-                            modifier = Modifier.align(Alignment.End)
-                        )
                     }
                 }
             }

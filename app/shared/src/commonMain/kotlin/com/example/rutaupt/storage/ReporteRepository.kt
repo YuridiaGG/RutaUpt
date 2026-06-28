@@ -1,16 +1,28 @@
 package com.example.rutaupt.storage
 
 import androidx.compose.runtime.mutableStateListOf
-import com.example.rutaupt.screens.ReporteUnidad
-import com.example.rutaupt.screens.ReporteTipo
+import com.example.rutaupt.model.ReporteUnidad
 
 object ReporteRepository {
-    val reportes = mutableStateListOf<ReporteUnidad>(
-        ReporteUnidad("UPT-05", "Unidad llena en Parada La Joya", "Hace 10 minutos", ReporteTipo.ALERTA),
-        ReporteUnidad("UPT-12", "Retraso por tráfico intenso", "Hace 25 minutos", ReporteTipo.INFORMACION)
-    )
+    val reportes = mutableStateListOf<ReporteUnidad>()
 
     fun agregarReporte(reporte: ReporteUnidad) {
         reportes.add(0, reporte)
+    }
+
+    fun actualizarValidacion(id: Long, estado: String) {
+        val index = reportes.indexOfFirst { it.id == id }
+        if (index != -1) {
+            val reporteActual = reportes[index]
+            reportes[index] = reporteActual.copy(validacionAdmin = estado)
+        }
+    }
+
+    fun eliminarReporte(id: Long) {
+        reportes.removeAll { it.id == id }
+    }
+
+    fun limpiarReportes() {
+        reportes.clear()
     }
 }

@@ -31,12 +31,13 @@ import org.jetbrains.compose.resources.painterResource
 import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.getPlatform
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.storage.ChoferRepository
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: (String) -> Unit,
     onRegisterClick: () -> Unit,
-    onForgotPasswordClick: () -> Unit // Nuevo parámetro
+    onForgotPasswordClick: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -56,18 +57,15 @@ fun LoginScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
+            // Imagen Inicial
+            Image(
+                painter = painterResource(Res.drawable.imagentoro),
+                contentDescription = "Toro UPT",
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(280.dp) 
-            ) {
-                Image(
-                    painter = painterResource(Res.drawable.imagentoro),
-                    contentDescription = "Toro UPT",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            }
+                    .fillMaxWidth() // Elimina el marco lateral
+                    .padding(top = 30.dp), // Espacio superior elegante
+                contentScale = ContentScale.FillWidth // Imagen completa que llena el ancho
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -78,7 +76,7 @@ fun LoginScreen(
                         append("RutaUPT")
                     }
                 },
-                fontSize = 24.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
@@ -161,7 +159,7 @@ fun LoginScreen(
                 color = vinoUpt,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.clickable { onForgotPasswordClick() } // Acción actualizada
+                modifier = Modifier.clickable { onForgotPasswordClick() }
             )
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -171,7 +169,15 @@ fun LoginScreen(
                     val user = email.lowercase().trim()
                     val pass = password.trim()
                     
+                    val choferEncontrado = ChoferRepository.choferes.find { 
+                        it.email.lowercase().trim() == user && it.contrasena == pass 
+                    }
+
                     val target = when {
+                        choferEncontrado != null -> {
+                            SessionManager.iniciarSesion("${choferEncontrado.nombre} ${choferEncontrado.apellidos}", email, "chofer")
+                            "chofer"
+                        }
                         user == "admin" && pass == "123" -> {
                             SessionManager.iniciarSesion("Administrador", email, "admin")
                             "admin"

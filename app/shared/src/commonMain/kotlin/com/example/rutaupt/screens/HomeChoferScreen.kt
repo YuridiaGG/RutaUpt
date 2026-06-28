@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.painterResource
 import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.getPlatform
+import com.example.rutaupt.model.ReporteUnidad
+import com.example.rutaupt.model.ReporteTipo
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
 import kotlinx.datetime.TimeZone
@@ -51,15 +53,24 @@ fun HomeChoferScreen(
     var showNotifications by remember { mutableStateOf(false) }
     var notificationsRead by remember { mutableStateOf(false) }
 
-    fun registrarEstado(estado: String, icono: ImageVector, color: Color) {
+    fun registrarEstado(estado: String, icono: ImageVector, color: Color, imagen: String? = null) {
         val now = kotlinx.datetime.Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
         val horaStr = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')}"
         val fechaStr = "${now.dayOfMonth}/${now.monthNumber} $horaStr"
         
         val unidad = "UPT-05"
-        val mensaje = "Unidad: $unidad, esta: $estado"
+        val mensaje = if (imagen != null) "Unidad: $unidad reporta retraso con evidencia" else "Unidad: $unidad, esta: $estado"
         
-        ReporteRepository.agregarReporte(ReporteUnidad(unidad, mensaje, fechaStr, ReporteTipo.INFORMACION))
+        ReporteRepository.agregarReporte(
+            ReporteUnidad(
+                unidad = unidad, 
+                mensaje = mensaje, 
+                tiempo = fechaStr, 
+                tipo = if (imagen != null) ReporteTipo.ALERTA else ReporteTipo.INFORMACION,
+                imagen = imagen,
+                estado = estado
+            )
+        )
         
         if (estado != "En recorrido" && estado != "Fin de ruta") {
             getPlatform().showNotification("RutaUPT Chofer", mensaje)
@@ -93,7 +104,21 @@ fun HomeChoferScreen(
                             onDismissRequest = { showNotifications = false },
                             modifier = Modifier.width(280.dp).background(Color.White)
                         ) {
-                            Text("Notificaciones", modifier = Modifier.padding(16.dp), fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Notificaciones", fontWeight = FontWeight.Bold)
+                                if (ReporteRepository.reportes.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { ReporteRepository.limpiarReportes() },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.DeleteSweep, contentDescription = "Limpiar todo", tint = Color.Gray)
+                                    }
+                                }
+                            }
                             HorizontalDivider()
                             if (ReporteRepository.reportes.isEmpty()) {
                                 Text("No hay notificaciones", modifier = Modifier.padding(16.dp), color = Color.Gray)
@@ -107,7 +132,12 @@ fun HomeChoferScreen(
                                             }
                                         },
                                         onClick = { showNotifications = false },
-                                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = vinoUpt) }
+                                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = vinoUpt) },
+                                        trailingIcon = {
+                                            IconButton(onClick = { ReporteRepository.eliminarReporte(reporte.id) }) {
+                                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -139,7 +169,7 @@ fun HomeChoferScreen(
                         vinoUpt, 
                         vinoOscuro, 
                         historial, 
-                        onEstadoSelected = { e, i, c -> registrarEstado(e, i, c) }
+                        onEstadoSelected = { e, i, c, img -> registrarEstado(e, i, c, img) }
                     )
                     "Mapa" -> ChoferMapaSection(vinoUpt)
                 }
@@ -153,10 +183,8 @@ fun ChoferInicioSection(
     vinoUpt: Color,
     vinoOscuro: Color,
     historial: List<ChoferHistorialAccion>,
-    onEstadoSelected: (String, ImageVector, Color) -> Unit
+    onEstadoSelected: (String, ImageVector, Color, String?) -> Unit
 ) {
-    var showCameraSim by remember { mutableStateOf(false) }
-
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Box(
             modifier = Modifier
@@ -234,7 +262,7 @@ fun ChoferInicioSection(
             )
             
             Button(
-                onClick = { onEstadoSelected("En recorrido", Icons.Default.DirectionsBus, Color(0xFFC62828)) },
+                onClick = { onEstadoSelected("En recorrido", Icons.Default.DirectionsBus, Color(0xFFC62828), null) },
                 modifier = Modifier.fillMaxWidth().height(80.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
                 shape = RoundedCornerShape(16.dp),
@@ -249,19 +277,22 @@ fun ChoferInicioSection(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatusGridButton("Retrasada", Icons.Default.CameraAlt, Color(0xFFE67E22), Modifier.weight(1f)) {
-                    showCameraSim = true
+                    // Abrir cámara real
+                    getPlatform().openCamera { img ->
+                        onEstadoSelected("Retrasada (Validando)", Icons.Default.AccessTime, Color(0xFFE67E22), img)
+                    }
                 }
                 StatusGridButton("Unidad llena", Icons.Default.Groups, Color(0xFFE67E22), Modifier.weight(1f)) {
-                    onEstadoSelected("Unidad llena", Icons.Default.Groups, Color(0xFFE67E22))
+                    onEstadoSelected("Unidad llena", Icons.Default.Groups, Color(0xFFE67E22), null)
                 }
             }
             Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatusGridButton("Disponible", Icons.Default.CheckCircle, Color(0xFF27AE60), Modifier.weight(1f)) {
-                    onEstadoSelected("Disponible", Icons.Default.CheckCircle, Color(0xFF27AE60))
+                    onEstadoSelected("Disponible", Icons.Default.CheckCircle, Color(0xFF27AE60), null)
                 }
                 StatusGridButton("Fin de ruta", Icons.Default.Flag, Color.Gray, Modifier.weight(1f)) {
-                    onEstadoSelected("Fin de ruta", Icons.Default.Flag, Color.Gray)
+                    onEstadoSelected("Fin de ruta", Icons.Default.Flag, Color.Gray, null)
                 }
             }
 
@@ -325,43 +356,23 @@ fun ChoferInicioSection(
             Spacer(Modifier.height(30.dp))
         }
     }
-
-    if (showCameraSim) {
-        AlertDialog(
-            onDismissRequest = { showCameraSim = false },
-            title = { Text("Cámara") },
-            text = { 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Camera, modifier = Modifier.size(64.dp), contentDescription = null)
-                    Text("Tomando foto para validación de retraso...")
-                }
-            },
-            confirmButton = {
-                Button(onClick = { 
-                    showCameraSim = false 
-                    onEstadoSelected("Retrasada (Validando)", Icons.Default.AccessTime, Color(0xFFE67E22))
-                }) { Text("Enviar Foto") }
-            }
-        )
-    }
 }
 
 @Composable
 fun ChoferMapaSection(vinoUpt: Color) {
     Box(modifier = Modifier.fillMaxSize()) {
-        Image(
-            painter = painterResource(Res.drawable.compose_multiplatform),
-            contentDescription = "Mapa",
-            modifier = Modifier.fillMaxSize().background(Color(0xFFF0F0F0)),
-            contentScale = ContentScale.Crop,
-            alpha = 0.5f
+        MapComponent(
+            modifier = Modifier.fillMaxSize(),
+            latitude = 20.0820,
+            longitude = -98.3680,
+            title = "Mi Ubicación"
         )
         Column(
             modifier = Modifier.fillMaxSize().padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Surface(
-                color = Color.White,
+                color = Color.White.copy(alpha = 0.9f),
                 shape = RoundedCornerShape(30.dp),
                 modifier = Modifier.fillMaxWidth().height(60.dp).shadow(8.dp, RoundedCornerShape(30.dp))
             ) {
@@ -372,12 +383,6 @@ fun ChoferMapaSection(vinoUpt: Color) {
                 }
             }
         }
-        Icon(
-            Icons.Default.LocationOn, 
-            null, 
-            tint = vinoUpt, 
-            modifier = Modifier.size(65.dp).align(Alignment.Center).offset(y = (-32).dp)
-        )
     }
 }
 
