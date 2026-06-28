@@ -18,10 +18,10 @@ dependencies {
     // Ktor Server
     implementation(libs.ktor.serverCore)
     implementation(libs.ktor.serverNetty)
-    implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.server.content.negotiation) // Corregido a SERVER
     implementation(libs.ktor.serialization.kotlinx.json)
     
-    // Exposed ORM & MySQL
+    // Database (MySQL)
     implementation(libs.exposed.core)
     implementation(libs.exposed.dao)
     implementation(libs.exposed.jdbc)
