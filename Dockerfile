@@ -1,21 +1,18 @@
-# ---------- Build Stage ----------
-FROM eclipse-temurin:17-jdk AS build
-WORKDIR /app
-COPY . .
-RUN chmod +x ./gradlew
-# Construimos solo el módulo del servidor
-RUN ./gradlew :server:installDist --no-daemon
+# Fase de compilación
+FROM gradle:8.7-jdk21 AS build
 
-# ---------- Run Stage ----------
-FROM eclipse-temurin:17-jre
-WORKDIR /app
+COPY --chown=gradle:gradle . /home/gradle/src
+WORKDIR /home/gradle/src
 
-# Exponemos el puerto que Railway inyectará
+RUN ./gradlew :server:build -x test --no-daemon
+
+# Fase de ejecución
+FROM eclipse-temurin:21-jre
+
 EXPOSE 8080
 
-# Copiamos la distribución instalada del servidor
-COPY --from=build /app/server/build/install/server /app/server
+RUN mkdir /app
 
-# Ejecutamos el servidor usando el script generado por Gradle
-WORKDIR /app/server/bin
-CMD ["./server"]
+COPY --from=build /home/gradle/src/server/build/libs/*.jar /app/ktor-server.jar
+
+ENTRYPOINT ["java","-jar","/app/ktor-server.jar"]

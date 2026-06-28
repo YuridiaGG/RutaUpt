@@ -1,42 +1,34 @@
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidMultiplatformLibrary)
+    alias(libs.plugins.serialization)
+    // Declaramos el plugin pero NO lo aplicamos automáticamente para evitar fallos en Railway
+    alias(libs.plugins.androidMultiplatformLibrary) apply false
+}
+
+// Detectamos el entorno de Railway
+val isRailwayBuild = System.getenv("RAILWAY_ENVIRONMENT_NAME") != null || System.getenv("PORT") != null
+
+// Aplicamos el plugin de Android SOLO si NO estamos en Railway
+if (!isRailwayBuild) {
+    apply(plugin = "com.android.kotlin.multiplatform.library")
 }
 
 kotlin {
-    jvm()
+    jvm() // Necesario para el servidor
     
-    js {
-        browser()
+    // Configuración segura de Android
+    plugins.withId("com.android.kotlin.multiplatform.library") {
+        configure<com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryExtension> {
+            namespace = "com.example.rutaupt.core"
+            compileSdk = 34
+            minSdk = 24
+        }
     }
-    
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-        browser()
-    }
-    
-    androidLibrary {
-       namespace = "com.example.rutaupt.core"
-       compileSdk = libs.versions.android.compileSdk.get().toInt()
-       minSdk = libs.versions.android.minSdk.get().toInt()
-    
-       compilerOptions {
-           jvmTarget = JvmTarget.JVM_11
-       }
-       androidResources {
-           enable = true
-       }
-       withHostTest {
-           isIncludeAndroidResources = true
-       }
-    }
-    
+
     sourceSets {
         commonMain.dependencies {
-            // put your Multiplatform dependencies here
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.ktor.serialization.kotlinx.json)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
