@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.kotlinJvm)
     alias(libs.plugins.ktor)
-    alias(libs.plugins.serialization)
+    alias(libs.plugins.kotlinSerialization)
 }
 
 group = "com.example.rutaupt"
@@ -18,7 +18,7 @@ dependencies {
     // Ktor Server
     implementation(libs.ktor.serverCore)
     implementation(libs.ktor.serverNetty)
-    implementation(libs.ktor.server.content.negotiation) // Corregido a SERVER
+    implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     
     // Database (MySQL)
