@@ -7,5 +7,9 @@
   "deploy": {
     "startCommand": "java -jar server/build/libs/server-1.0.0-all.jar",
     "restartPolicyType": "ON_FAILURE"
+  },
+  "environments": {
+    "NIXPACKS_JDK_VERSION": "17",
+    "JAVA_VERSION": "17"
   }
 }
