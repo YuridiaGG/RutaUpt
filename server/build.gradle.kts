@@ -10,6 +10,17 @@ version = "1.0.0"
 application {
     mainClass.set("com.example.rutaupt.ApplicationKt")
 }
+tasks.jar {
+    manifest {
+        attributes["Main-Class"] = "com.example.rutaupt.ApplicationKt"
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from(configurations.runtimeClasspath.get().map {
+        if (it.isDirectory) it else zipTree(it)
+    })
+}
 
 dependencies {
     api(projects.core)
