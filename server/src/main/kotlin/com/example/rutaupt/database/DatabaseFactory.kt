@@ -70,11 +70,11 @@ object UbicacionesTiempoReal : Table("ubicaciones_tiempo_real") {
 // 2. CONEXIÓN AUTOMÁTICA Y CREACIÓN
 object DatabaseFactory {
     fun init() {
-        val host = System.getenv("MYSQLHOST") ?: "localhost"
-        val port = System.getenv("MYSQLPORT") ?: "3306"
+        val host = System.getenv("MYSQLHOST") ?: "reseau.proxy.rlwy.net"
+        val port = System.getenv("MYSQLPORT") ?: "52875"
         val dbName = System.getenv("MYSQLDATABASE") ?: "railway"
         val user = System.getenv("MYSQLUSER") ?: "root"
-        val password = System.getenv("MYSQLPASSWORD") ?: ""
+        val password = System.getenv("MYSQLPASSWORD") ?: "xBovtCqtJMzdcfPcLFsHcMZCHLrfCifY"
 
         val config = HikariConfig().apply {
             driverClassName = "com.mysql.cj.jdbc.Driver"
