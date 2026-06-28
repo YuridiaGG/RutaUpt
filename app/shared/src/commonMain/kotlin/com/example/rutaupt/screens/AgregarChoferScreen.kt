@@ -17,15 +17,13 @@ import com.example.rutaupt.model.Chofer
 fun AgregarChoferScreen(
     onVolver: () -> Unit
 ) {
-
     var pantalla by remember { mutableStateOf("menu") }
     var choferAEditar by remember { mutableStateOf<Chofer?>(null) }
 
     when (pantalla) {
-
         "formulario" -> {
             FormularioChoferScreen(
-                choferEditar = choferAEditar,
+                choferElegido = choferAEditar,
                 onVolver = {
                     pantalla = "menu"
                     choferAEditar = null
@@ -38,6 +36,10 @@ fun AgregarChoferScreen(
                 onVolver = {
                     pantalla = "menu"
                 },
+                onAgregarChofer = {
+                    choferAEditar = null
+                    pantalla = "formulario"
+                },
                 onEditarChofer = { chofer ->
                     choferAEditar = chofer
                     pantalla = "formulario"
@@ -46,13 +48,10 @@ fun AgregarChoferScreen(
         }
 
         else -> {
-
             Scaffold(
                 topBar = {
                     TopAppBar(
-                        title = {
-                            Text("Gestión de Choferes")
-                        },
+                        title = { Text("Gestión de Choferes") },
                         navigationIcon = {
                             IconButton(onClick = onVolver) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -61,7 +60,6 @@ fun AgregarChoferScreen(
                     )
                 }
             ) { padding ->
-
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -69,7 +67,6 @@ fun AgregarChoferScreen(
                         .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-
                     Card(
                         onClick = {
                             choferAEditar = null
@@ -78,25 +75,14 @@ fun AgregarChoferScreen(
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp)
                         ) {
-
-                            Icon(
-                                Icons.Default.DirectionsBus,
-                                contentDescription = null
-                            )
-
-                            Spacer(
-                                modifier = Modifier.width(12.dp)
-                            )
-
-                            Text(
-                                "Agregar Chofer Nuevo"
-                            )
+                            Icon(Icons.Default.DirectionsBus, contentDescription = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Agregar Chofer Nuevo")
                         }
                     }
 
@@ -107,25 +93,14 @@ fun AgregarChoferScreen(
                         shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp)
                         ) {
-
-                            Icon(
-                                Icons.Default.List,
-                                contentDescription = null
-                            )
-
-                            Spacer(
-                                modifier = Modifier.width(12.dp)
-                            )
-
-                            Text(
-                                "Ver Choferes"
-                            )
+                            Icon(Icons.Default.List, contentDescription = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Ver Choferes")
                         }
                     }
                 }

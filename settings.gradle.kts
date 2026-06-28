@@ -28,8 +28,13 @@ dependencyResolutionManagement {
     }
 }
 
-include(":app:androidApp")
-include(":app:shared")
-include(":app:webApp")
+val isRailway = System.getenv("RAILWAY_STATIC_URL") != null || System.getenv("PORT") != null
+
+if (!isRailway) {
+    include(":app:androidApp")
+    include(":app:shared")
+    include(":app:webApp")
+}
+
 include(":core")
 include(":server")
