@@ -1,19 +1,22 @@
-# Fase de compilación
-FROM gradle:8.5-jdk17 AS build
+# ---------- Build ----------
+FROM eclipse-temurin:17-jdk AS build
 
-COPY --chown=gradle:gradle . /home/gradle/src
+WORKDIR /app
 
-WORKDIR /home/gradle/src
+COPY . .
 
-RUN gradle build -x test --no-daemon
+RUN chmod +x ./gradlew
 
-# Fase de ejecución
-FROM openjdk:17-slim
+RUN ./gradlew :server:build -x test --no-daemon
+
+
+# ---------- Run ----------
+FROM eclipse-temurin:17-jre
+
+WORKDIR /app
 
 EXPOSE 8080
 
-RUN mkdir /app
+COPY --from=build /app/server/build/libs/*.jar app.jar
 
-COPY --from=build /home/gradle/src/build/libs/*.jar /app/app.jar
-
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+CMD ["java","-jar","app.jar"]
