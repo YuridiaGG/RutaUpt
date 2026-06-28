@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import org.jetbrains.compose.resources.painterResource
-import com.example.rutaupt.app.shared.generated.resources.*
+import rutaupt.app.shared.generated.resources.*
 
 object DriverColors {
     val Vino          = Color(0xFF6B1124)

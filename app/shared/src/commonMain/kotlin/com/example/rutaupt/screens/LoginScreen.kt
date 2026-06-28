@@ -25,21 +25,6 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.*
-import com.example.rutaupt.R
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Colores UPT
-// ─────────────────────────────────────────────────────────────────────────────
-object UPTColors {
-    val Vino        = Color(0xFF6B0F1A)
-    val Blanco      = Color(0xFFFFFFFF)
-    val Negro       = Color(0xFF111111)
-    val GrisMedio   = Color(0xFF888888)
-    val GrisClaro   = Color(0xFFDDDDDD)
-    val FondoInput  = Color(0xFFFAFAFA)
-    val FondoHero   = Color(0xFFF2F2F2)
-    val Pasto       = Color(0xFFC8E6C9)
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Pantalla principal de Login

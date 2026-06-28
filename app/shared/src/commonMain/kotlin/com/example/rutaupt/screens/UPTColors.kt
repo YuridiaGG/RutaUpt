@@ -12,4 +12,13 @@ object UPTColors {
     val BlancoSuave = Color(0xFFE8D5C4)   // Texto secundario
     val Superficie  = Color(0x26FFFFFF)   // Card translúcida
     val Error       = Color(0xFFFF6B6B)
+    
+    // Colores de LoginScreen
+    val BlancoPuro  = Color(0xFFFFFFFF)
+    val Negro       = Color(0xFF111111)
+    val GrisMedio   = Color(0xFF888888)
+    val GrisClaro   = Color(0xFFDDDDDD)
+    val FondoInput  = Color(0xFFFAFAFA)
+    val FondoHero   = Color(0xFFF2F2F2)
+    val Pasto       = Color(0xFFC8E6C9)
 }
