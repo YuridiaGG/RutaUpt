@@ -7,16 +7,16 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary) apply false
 }
 
-// Detectamos si estamos en el entorno de Railway (donde no hay SDK de Android)
-val isRailwayBuild = System.getenv("RAILWAY_ENVIRONMENT_NAME") != null || System.getenv("PORT") != null
+// Detectamos el entorno de Railway (donde no hay SDK de Android)
+val isInRailwayEnv = System.getenv("RAILWAY_ENVIRONMENT_NAME") != null || System.getenv("PORT") != null
 
 // Aplicamos el plugin de Android SOLO si NO estamos en Railway
-if (!isRailwayBuild) {
+if (!isInRailwayEnv) {
     apply(plugin = "com.android.kotlin.multiplatform.library")
 }
 
 kotlin {
-    // NOTA: Se eliminó androidTarget() porque el plugin 'androidMultiplatformLibrary' ya lo crea automáticamente.
+    // NOTA: NO llames a androidTarget(). El plugin 'androidMultiplatformLibrary' ya lo crea.
     
     jvm()
 
@@ -29,7 +29,7 @@ kotlin {
         browser()
     }
 
-    // Configuración segura: solo se ejecuta si el plugin de Android está presente (entorno local)
+    // Configuración segura: solo se ejecuta si el plugin de Android está presente
     plugins.withId("com.android.kotlin.multiplatform.library") {
         configure<com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryExtension> {
             namespace = "com.example.rutaupt.core"

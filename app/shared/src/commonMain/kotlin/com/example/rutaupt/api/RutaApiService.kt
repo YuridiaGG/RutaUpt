@@ -1,6 +1,7 @@
 package com.example.rutaupt.api
 
 import com.example.rutaupt.model.Route
+import com.example.rutaupt.model.User // Aseguramos la importación de tu modelo de Usuario
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -33,7 +34,19 @@ class RutaApiService {
         return try {
             client.get("$BASE_URL/api/rutas").body()
         } catch (e: Exception) {
-            println("Error al conectar con la API: ${e.message}")
+            println("Error al conectar con la API de rutas: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * Obtiene los usuarios con rol de chofer desde el backend en Railway
+     */
+    suspend fun obtenerChoferes(): List<User> {
+        return try {
+            client.get("$BASE_URL/api/usuarios/choferes").body()
+        } catch (e: Exception) {
+            println("Error al obtener choferes de la API: ${e.message}")
             emptyList()
         }
     }

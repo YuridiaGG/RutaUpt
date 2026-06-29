@@ -27,11 +27,14 @@ dependencies {
     api(projects.core)
     implementation(libs.logback)
 
-    implementation(libs.ktor.serverCore)
-    implementation(libs.ktor.serverNetty)
-    implementation(libs.ktor.server.content.negotiation)
+    // Ktor Server - Se accede con puntos porque en libs.versions.toml están definidos con guiones
+    implementation(libs.ktor.server.core)
+    implementation(libs.ktor.server.netty)
+    implementation(libs.ktor.server.content.negotiation) 
+    implementation(libs.ktor.server.status.pages)
     implementation(libs.ktor.serialization.kotlinx.json)
 
+    // Database
     implementation(libs.exposed.core)
     implementation(libs.exposed.dao)
     implementation(libs.exposed.jdbc)
@@ -42,6 +45,6 @@ dependencies {
     // Email service
     implementation(libs.jakarta.mail)
 
-    testImplementation(libs.ktor.serverTestHost)
+    testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.testJunit)
 }

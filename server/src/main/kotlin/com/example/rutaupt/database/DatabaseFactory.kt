@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory
 
 object DatabaseFactory {
     private val logger = LoggerFactory.getLogger(DatabaseFactory::class.java)
+    private var dbInstance: Database? = null
 
     fun init() {
         val host = System.getenv("MYSQLHOST") ?: "localhost"
@@ -18,7 +19,8 @@ object DatabaseFactory {
         val user = System.getenv("MYSQLUSER") ?: "root"
         val password = System.getenv("MYSQLPASSWORD") ?: ""
 
-        val jdbcUrl = "jdbc:mysql://$host:$port/$dbName?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+        // URL robusta para Railway
+        val jdbcUrl = "jdbc:mysql://$host:$port/$dbName?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8"
         
         try {
             val config = HikariConfig().apply {
@@ -26,57 +28,43 @@ object DatabaseFactory {
                 this.jdbcUrl = jdbcUrl
                 this.username = user
                 this.password = password
-                maximumPoolSize = 10
+                maximumPoolSize = 5
+                minimumIdle = 1
+                connectionTimeout = 30000
                 isAutoCommit = false
                 transactionIsolation = "TRANSACTION_REPEATABLE_READ"
                 validate()
             }
 
-            val dataSource = HikariDataSource(config)
-            Database.connect(dataSource)
+            dbInstance = Database.connect(HikariDataSource(config))
 
-            transaction {
+            transaction(dbInstance) {
                 SchemaUtils.create(Usuarios, Rutas, Paradas, Horarios, Reportes, UbicacionesTiempoReal)
                 
-                // Seed Usuarios Iniciales (Solo si no existen)
-                if (Usuarios.selectAll().where { Usuarios.id eq 1 }.empty()) {
-                    Usuarios.insert {
-                        it[id] = 1
-                        it[nombre] = "Administrador"
-                        it[apellidos] = "Sistema"
-                        it[email] = "admin@upt.edu.mx"
-                        it[Usuarios.password] = "123"
-                        it[rol] = "admin"
-                    }
-                }
-                if (Usuarios.selectAll().where { Usuarios.id eq 2 }.empty()) {
-                    Usuarios.insert {
-                        it[id] = 2
-                        it[nombre] = "Chofer Demo"
-                        it[apellidos] = "Sistema"
-                        it[email] = "chofer@upt.edu.mx"
-                        it[Usuarios.password] = "123"
-                        it[rol] = "chofer"
-                        it[numeroUnidad] = "UPT-05"
-                    }
-                }
-                if (Usuarios.selectAll().where { Usuarios.id eq 3 }.empty()) {
-                    Usuarios.insert {
-                        it[id] = 3
-                        it[nombre] = "Estudiante Demo"
-                        it[apellidos] = "Sistema"
-                        it[email] = "estudiante@upt.edu.mx"
-                        it[Usuarios.password] = "123"
-                        it[rol] = "estudiante"
-                    }
-                }
+                // Seed Usuario Administrador Principal con las credenciales solicitadas
+                seedUser("admin@upt.com", "Admin", "Admin", "admin")
+                
+                // Se eliminaron los usuarios demo (chofer y estudiante) para iniciar con datos reales
             }
-            logger.info("Base de datos MySQL conectada y usuarios demo verificados.")
+            logger.info("Base de datos MySQL conectada y sincronizada.")
         } catch (e: Exception) {
-            logger.error("Error al conectar con MySQL: ${e.message}")
+            logger.error("ERROR CRITICO DE BASE DE DATOS: ${e.message}")
+        }
+    }
+
+    private fun seedUser(email: String, nombre: String, apellidos: String, rol: String, unidad: String? = null) {
+        if (Usuarios.selectAll().where { Usuarios.email eq email }.count() == 0L) {
+            Usuarios.insert {
+                it[Usuarios.nombre] = nombre
+                it[Usuarios.apellidos] = apellidos
+                it[Usuarios.email] = email
+                it[Usuarios.password] = "123"
+                it[Usuarios.rol] = rol
+                it[Usuarios.numeroUnidad] = unidad
+            }
         }
     }
 
     suspend fun <T> dbQuery(block: suspend () -> T): T =
-        newSuspendedTransaction(Dispatchers.IO) { block() }
+        newSuspendedTransaction(Dispatchers.IO, db = dbInstance) { block() }
 }

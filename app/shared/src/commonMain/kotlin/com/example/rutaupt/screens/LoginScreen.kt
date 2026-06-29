@@ -181,18 +181,20 @@ fun LoginScreen(
                         
                         isLoading = true
                         scope.launch {
-                            val response = authService.login(email.lowercase().trim(), password.trim())
+                            val loginResponse = authService.login(email.lowercase().trim(), password.trim())
                             isLoading = false
                             
-                            if (response.success && response.user != null) {
-                                // CORRECCIÓN DE NULABILIDAD: Uso de ?.let para desempaquetado seguro
-                                response.user?.let { user ->
+                            if (loginResponse.success) {
+                                // DESEMPAQUETADO SEGURO DE NULOS
+                                loginResponse.user?.let { user ->
                                     SessionManager.iniciarSesion("${user.nombre} ${user.apellidos}", user.email, user.rol)
                                     getPlatform().showNotification("RutaUPT", "¡Hola ${user.nombre}!")
                                     onLoginSuccess(user.rol.lowercase())
+                                } ?: run {
+                                    snackbarHostState.showSnackbar("Error: Datos de usuario incompletos.")
                                 }
                             } else {
-                                snackbarHostState.showSnackbar(response.message)
+                                snackbarHostState.showSnackbar(loginResponse.message)
                             }
                         }
                     },

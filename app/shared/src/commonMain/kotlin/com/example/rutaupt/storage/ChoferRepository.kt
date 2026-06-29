@@ -7,4 +7,8 @@ object ChoferRepository {
 
     val choferes = mutableStateListOf<Chofer>()
 
+    fun eliminarChofer(id: Int) {
+        choferes.removeAll { it.id == id }
+    }
+
 }

@@ -3,7 +3,6 @@ package com.example.rutaupt.database
 import com.example.rutaupt.database.DatabaseFactory.dbQuery
 import com.example.rutaupt.model.User
 import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 
 class AuthRepository {
     suspend fun findUserByEmail(email: String): User? = dbQuery {
@@ -15,18 +14,18 @@ class AuthRepository {
     suspend fun registerUser(user: User): Boolean = dbQuery {
         try {
             Usuarios.insert {
-                it[nombre] = user.nombre
-                it[apellidos] = user.apellidos
-                it[email] = user.email
-                it[password] = user.password ?: ""
-                it[rol] = user.rol
-                it[edad] = user.edad
-                it[telefono] = user.telefono
-                it[numeroUnidad] = user.numeroUnidad
+                it[Usuarios.nombre] = user.nombre
+                it[Usuarios.apellidos] = user.apellidos
+                it[Usuarios.email] = user.email
+                it[Usuarios.password] = user.password ?: ""
+                it[Usuarios.rol] = user.rol
+                it[Usuarios.edad] = user.edad
+                it[Usuarios.telefono] = user.telefono
+                it[Usuarios.numeroUnidad] = user.numeroUnidad
             }
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            println("Error al insertar usuario: ${e.message}")
             false
         }
     }

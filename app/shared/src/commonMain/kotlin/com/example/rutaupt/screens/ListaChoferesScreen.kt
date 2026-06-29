@@ -8,12 +8,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,6 +28,32 @@ fun ListaChoferesScreen(
     onEditarChofer: (Chofer) -> Unit
 ) {
     val vinoUpt = UPTColors.Vino
+    var choferAEliminar by remember { mutableStateOf<Chofer?>(null) }
+
+    if (choferAEliminar != null) {
+        AlertDialog(
+            onDismissRequest = { choferAEliminar = null },
+            title = { Text("Confirmar eliminación") },
+            text = { Text("¿Está seguro de que desea eliminar al chofer ${choferAEliminar?.nombre}? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        choferAEliminar?.let { ChoferRepository.eliminarChofer(it.id) }
+                        choferAEliminar = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { choferAEliminar = null }) {
+                    Text("Cancelar")
+                }
+            },
+            containerColor = Color.White
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -76,8 +99,8 @@ fun ListaChoferesScreen(
                 items(ChoferRepository.choferes) { chofer ->
                     ChoferPerfilCard(
                         chofer = chofer,
-                        onVer = { /* Implementar ver detalles si es necesario */ },
-                        onEditar = { onEditarChofer(chofer) }
+                        onEditar = { onEditarChofer(chofer) },
+                        onEliminar = { choferAEliminar = chofer }
                     )
                 }
             }
@@ -88,8 +111,8 @@ fun ListaChoferesScreen(
 @Composable
 fun ChoferPerfilCard(
     chofer: Chofer,
-    onVer: () -> Unit,
-    onEditar: () -> Unit
+    onEditar: () -> Unit,
+    onEliminar: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -127,10 +150,8 @@ fun ChoferPerfilCard(
             Spacer(Modifier.height(12.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = onVer) {
-                    Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Ver", fontWeight = FontWeight.SemiBold)
+                IconButton(onClick = onEliminar) {
+                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red.copy(alpha = 0.7f))
                 }
                 Spacer(Modifier.width(8.dp))
                 Button(

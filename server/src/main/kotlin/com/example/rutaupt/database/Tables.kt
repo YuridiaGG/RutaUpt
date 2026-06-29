@@ -9,8 +9,8 @@ object Usuarios : Table("usuarios") {
     val email = varchar("email", 100).uniqueIndex()
     val password = varchar("password", 255)
     val rol = varchar("rol", 20) // 'admin', 'estudiante', 'chofer'
-    val edad = varchar("edad", 3).nullable()
-    val telefono = varchar("telefono", 15).nullable()
+    val edad = varchar("edad", 5).nullable()
+    val telefono = varchar("telefono", 20).nullable()
     val numeroUnidad = varchar("numero_unidad", 20).nullable()
     override val primaryKey = PrimaryKey(id)
 }
