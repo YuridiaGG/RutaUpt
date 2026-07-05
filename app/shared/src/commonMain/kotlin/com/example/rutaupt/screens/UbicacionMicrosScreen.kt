@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.rutaupt.api.RutaApiService
+import com.example.rutaupt.model.User
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +30,14 @@ fun UbicacionMicrosScreen(
 ) {
     val vinoUpt = UPTColors.Vino
     var unidadSeleccionada by remember { mutableStateOf<String?>(null) }
+    val apiService = remember { RutaApiService() }
+    var choferes by remember { mutableStateOf<List<User>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        choferes = apiService.obtenerUsuariosPorRol("chofer")
+        isLoading = false
+    }
 
     Scaffold(
         topBar = {
@@ -50,7 +60,13 @@ fun UbicacionMicrosScreen(
         containerColor = Color(0xFFF8F9FA)
     ) { padding ->
         if (unidadSeleccionada == null) {
-            ListaUnidadesActivas(padding) { unidadSeleccionada = it }
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = vinoUpt)
+                }
+            } else {
+                ListaUnidadesActivas(padding, choferes) { unidadSeleccionada = it }
+            }
         } else {
             MapaTiempoReal(padding, unidadSeleccionada!!)
         }
@@ -58,18 +74,23 @@ fun UbicacionMicrosScreen(
 }
 
 @Composable
-fun ListaUnidadesActivas(padding: PaddingValues, onSelect: (String) -> Unit) {
-    val unidades = listOf("UPT-01", "UPT-05", "UPT-12", "UPT-24")
-    
+fun ListaUnidadesActivas(padding: PaddingValues, choferes: List<User>, onSelect: (String) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(padding),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Text("Seleccione una unidad para ver su ubicación en tiempo real:", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 8.dp))
+            Text(
+                if (choferes.isEmpty()) "No hay unidades activas registradas." 
+                else "Seleccione una unidad para ver su ubicación en tiempo real:", 
+                color = Color.Gray, 
+                fontSize = 14.sp, 
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
         }
-        items(unidades) { unidad ->
+        items(choferes) { chofer ->
+            val unidad = chofer.numeroUnidad ?: "Sin número"
             Card(
                 modifier = Modifier.fillMaxWidth().clickable { onSelect(unidad) },
                 shape = RoundedCornerShape(16.dp),
@@ -88,8 +109,8 @@ fun ListaUnidadesActivas(padding: PaddingValues, onSelect: (String) -> Unit) {
                     }
                     Spacer(Modifier.width(16.dp))
                     Column {
-                        Text(unidad, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("En recorrido - Ruta 05", color = Color.Gray, fontSize = 14.sp)
+                        Text("Unidad $unidad", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text("${chofer.nombre} ${chofer.apellidos}", color = Color.Gray, fontSize = 14.sp)
                     }
                     Spacer(Modifier.weight(1f))
                     Icon(Icons.Default.LocationOn, contentDescription = "Ubicación", tint = Color.Red)

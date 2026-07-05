@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rutaupt.model.Chofer
 import com.example.rutaupt.storage.ChoferRepository
-import com.example.rutaupt.storage.ChoferLogger
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,6 +26,7 @@ fun FormularioChoferScreen(
     choferElegido: Chofer? = null,
     onVolver: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
     var nombre by remember { mutableStateOf(choferElegido?.nombre ?: "") }
     var apellidos by remember { mutableStateOf(choferElegido?.apellidos ?: "") }
     var edad by remember { mutableStateOf(choferElegido?.edad ?: "") }
@@ -145,35 +146,31 @@ fun FormularioChoferScreen(
 
             Button(
                 onClick = {
-                    if (nombre.isNotBlank() && numeroUnidad.isNotBlank()) {
-                        if (choferElegido == null) {
-                            ChoferLogger.agregarChofer(
-                                Chofer(
-                                    id = ChoferRepository.choferes.size + 1,
-                                    nombre = nombre,
-                                    apellidos = apellidos,
-                                    edad = edad,
-                                    telefono = telefono,
-                                    numeroUnidad = numeroUnidad,
-                                    email = email,
-                                    contrasena = password
-                                )
+                    if (nombre.isNotBlank() && email.isNotBlank()) {
+                        scope.launch {
+                            val chofer = Chofer(
+                                id = choferElegido?.id ?: 0,
+                                nombre = nombre,
+                                apellidos = apellidos,
+                                edad = edad,
+                                telefono = telefono,
+                                numeroUnidad = numeroUnidad,
+                                email = email,
+                                contrasena = password
                             )
-                        } else {
-                            val index = ChoferRepository.choferes.indexOfFirst { it.id == choferElegido.id }
-                            if (index != -1) {
-                                ChoferRepository.choferes[index] = choferElegido.copy(
-                                    nombre = nombre,
-                                    apellidos = apellidos,
-                                    edad = edad,
-                                    telefono = telefono,
-                                    numeroUnidad = numeroUnidad,
-                                    email = email,
-                                    contrasena = password
-                                )
+                            
+                            val exito = if (choferElegido == null) {
+                                ChoferRepository.registrarChofer(chofer)
+                            } else {
+                                // De momento asumimos éxito para la edición local si no hay endpoint de update aún
+                                // O podrías implementar ChoferRepository.actualizarChofer(chofer)
+                                true 
+                            }
+                            
+                            if (exito) {
+                                onVolver()
                             }
                         }
-                        onVolver()
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),

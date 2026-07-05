@@ -9,8 +9,12 @@ import kotlinx.datetime.toLocalDateTime
 
 object SessionManager {
     var nombreUsuario by mutableStateOf("")
+    var apellidosUsuario by mutableStateOf("")
     var emailUsuario by mutableStateOf("")
     var rolUsuario by mutableStateOf("")
+    var numeroUnidad by mutableStateOf("")
+    var telefonoUsuario by mutableStateOf("")
+    var edadUsuario by mutableStateOf("")
     
     // Lógica para 2 reportes al día
     var reportesEnviadosHoy by mutableStateOf(0)
@@ -25,21 +29,22 @@ object SessionManager {
         }
     }
 
-    fun iniciarSesion(nombre: String, email: String, rol: String) {
-        // Priorizamos el nombre proporcionado. 
-        // Si el nombre parece un correo (contiene @), extraemos el prefijo.
-        // Si no, lo usamos tal cual (ej. "Ejemplo")
-        nombreUsuario = if (nombre.contains("@")) {
-            nombre.substringBefore("@")
-                .replace(".", " ")
-                .split(" ")
-                .joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
-        } else {
-            nombre.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
-        }
-        
+    fun iniciarSesion(
+        nombre: String, 
+        apellidos: String, 
+        email: String, 
+        rol: String,
+        unidad: String? = null,
+        telefono: String? = null,
+        edad: String? = null
+    ) {
+        nombreUsuario = nombre.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
+        apellidosUsuario = apellidos.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
         emailUsuario = email
         rolUsuario = rol
+        numeroUnidad = unidad ?: ""
+        telefonoUsuario = telefono ?: ""
+        edadUsuario = edad ?: ""
         
         // Verificar si debemos reiniciar el contador diario
         val hoy = obtenerFechaActual()
@@ -67,8 +72,11 @@ object SessionManager {
 
     fun cerrarSesion() {
         nombreUsuario = ""
+        apellidosUsuario = ""
         emailUsuario = ""
         rolUsuario = ""
-        // Mantener reportesEnviadosHoy para persistencia de sesión en el mismo día
+        numeroUnidad = ""
+        telefonoUsuario = ""
+        edadUsuario = ""
     }
 }

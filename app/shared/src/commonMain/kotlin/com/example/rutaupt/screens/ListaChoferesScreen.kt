@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rutaupt.model.Chofer
 import com.example.rutaupt.storage.ChoferRepository
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,7 +29,13 @@ fun ListaChoferesScreen(
     onEditarChofer: (Chofer) -> Unit
 ) {
     val vinoUpt = UPTColors.Vino
+    val scope = rememberCoroutineScope()
     var choferAEliminar by remember { mutableStateOf<Chofer?>(null) }
+
+    // Cargar datos reales desde el servidor al entrar
+    LaunchedEffect(Unit) {
+        ChoferRepository.cargarDesdeServidor()
+    }
 
     if (choferAEliminar != null) {
         AlertDialog(
@@ -38,7 +45,13 @@ fun ListaChoferesScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        choferAEliminar?.let { ChoferRepository.eliminarChofer(it.id) }
+                        val id = choferAEliminar?.id
+                        if (id != null) {
+                            // CORRECCIÓN: Llamada suspend dentro de launch
+                            scope.launch {
+                                ChoferRepository.eliminarChofer(id)
+                            }
+                        }
                         choferAEliminar = null
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)

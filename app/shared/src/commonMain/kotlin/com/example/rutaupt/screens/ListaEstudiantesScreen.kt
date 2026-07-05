@@ -9,8 +9,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rutaupt.storage.EstudianteRepository
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,6 +27,12 @@ fun ListaEstudiantesScreen(
     onVolver: () -> Unit
 ) {
     val vinoUpt = UPTColors.Vino
+    val scope = rememberCoroutineScope()
+
+    // Cargar datos desde el servidor al entrar
+    LaunchedEffect(Unit) {
+        EstudianteRepository.cargarDesdeServidor()
+    }
 
     Scaffold(
         topBar = {
@@ -83,12 +91,26 @@ fun ListaEstudiantesScreen(
                         ) {
                             Icon(Icons.Default.Person, contentDescription = null, tint = vinoUpt)
                             Spacer(Modifier.width(16.dp))
-                            Text(
-                                text = estudiante,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = Color.Black
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${estudiante.nombre} ${estudiante.apellidos}",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                                Text(
+                                    text = estudiante.email,
+                                    fontSize = 14.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                            IconButton(onClick = {
+                                scope.launch {
+                                    estudiante.id?.let { EstudianteRepository.eliminarEstudiante(it) }
+                                }
+                            }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red.copy(alpha = 0.6f))
+                            }
                         }
                     }
                 }

@@ -159,7 +159,13 @@ fun RegisterEstudianteScreen(
                         val response = authService.register(user)
                         isLoading = false
                         if (response.success) {
-                            SessionManager.iniciarSesion(nombre, email, "estudiante")
+                            // CORRECCIÓN: Pasar apellido
+                            SessionManager.iniciarSesion(
+                                nombre = nombre,
+                                apellidos = apellido,
+                                email = email,
+                                rol = "estudiante"
+                            )
                             getPlatform().showNotification("RutaUPT", "¡Bienvenido(a) $nombre!")
                             onRegisterSuccess()
                         } else {

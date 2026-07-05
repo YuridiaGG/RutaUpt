@@ -185,9 +185,16 @@ fun LoginScreen(
                             isLoading = false
                             
                             if (loginResponse.success) {
-                                // DESEMPAQUETADO SEGURO DE NULOS
                                 loginResponse.user?.let { user ->
-                                    SessionManager.iniciarSesion("${user.nombre} ${user.apellidos}", user.email, user.rol)
+                                    SessionManager.iniciarSesion(
+                                        nombre = user.nombre,
+                                        apellidos = user.apellidos,
+                                        email = user.email,
+                                        rol = user.rol,
+                                        unidad = user.numeroUnidad,
+                                        telefono = user.telefono,
+                                        edad = user.edad
+                                    )
                                     getPlatform().showNotification("RutaUPT", "¡Hola ${user.nombre}!")
                                     onLoginSuccess(user.rol.lowercase())
                                 } ?: run {

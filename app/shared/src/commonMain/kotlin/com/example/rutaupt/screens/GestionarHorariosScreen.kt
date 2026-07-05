@@ -31,13 +31,20 @@ fun GestionarHorariosScreen(
     val vinoUpt = UPTColors.Vino
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var isLoading by remember { mutableStateOf(true) }
+
+    // Sincronizar con el servidor al entrar
+    LaunchedEffect(Unit) {
+        ChoferRepository.cargarDesdeServidor()
+        isLoading = false
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Gestionar Horarios", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onVolver) {
+                    IconButton(onClick = onVolver, enabled = !isLoading) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
@@ -50,22 +57,28 @@ fun GestionarHorariosScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color(0xFFF8F9FA)
     ) { padding ->
-        if (ChoferRepository.choferes.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("No hay choferes registrados", color = Color.Gray)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(ChoferRepository.choferes) { chofer ->
-                    HorarioCard(chofer, onSave = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Horario asignado")
-                        }
-                    })
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = vinoUpt)
+            } else if (ChoferRepository.choferes.isEmpty()) {
+                Text(
+                    "No hay choferes registrados en el sistema", 
+                    modifier = Modifier.align(Alignment.Center),
+                    color = Color.Gray
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    items(ChoferRepository.choferes) { chofer ->
+                        HorarioCard(chofer, onSave = {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Horario actualizado para ${chofer.nombre}")
+                            }
+                        })
+                    }
                 }
             }
         }
@@ -74,13 +87,12 @@ fun GestionarHorariosScreen(
 
 @Composable
 fun HorarioCard(chofer: Chofer, onSave: () -> Unit) {
-    // Determinar si ya tiene un horario asignado (asumimos que un horario real tiene un guion "-" o es distinto de los defaults)
+    val vinoUpt = UPTColors.Vino
     val tieneHorario = chofer.horario.contains("-")
     var isEditing by remember { mutableStateOf(!tieneHorario) }
     
     var horaInicio by remember { mutableStateOf("") }
     var turnoInicio by remember { mutableStateOf("A.M.") }
-    
     var horaLlegada by remember { mutableStateOf("") }
     var turnoLlegada by remember { mutableStateOf("A.M.") }
 
@@ -93,117 +105,60 @@ fun HorarioCard(chofer: Chofer, onSave: () -> Unit) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Chofer: ${chofer.nombre} ${chofer.apellidos}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text(text = "${chofer.nombre} ${chofer.apellidos}", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     Text(text = "Unidad: ${chofer.numeroUnidad}", fontSize = 14.sp, color = Color.Gray)
                 }
                 if (!isEditing) {
                     IconButton(onClick = { isEditing = true }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = UPTColors.Vino)
+                        Icon(Icons.Default.Edit, contentDescription = "Editar", tint = vinoUpt)
                     }
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Mostrar horario si ya está asignado y no estamos editando
             if (!isEditing) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Surface(
-                    color = UPTColors.Vino.copy(alpha = 0.05f),
+                    color = vinoUpt.copy(alpha = 0.05f),
                     shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.AccessTime, contentDescription = null, tint = UPTColors.Vino, modifier = Modifier.size(20.dp))
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AccessTime, null, tint = vinoUpt, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "Horario: ${chofer.horario}",
-                            fontWeight = FontWeight.Bold,
-                            color = UPTColors.Vino,
-                            fontSize = 15.sp
-                        )
+                        Text(text = "Horario: ${chofer.horario}", fontWeight = FontWeight.Bold, color = vinoUpt)
                     }
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                OutlinedButton(
-                    onClick = { isEditing = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = UPTColors.Vino)
-                ) {
-                    Text("Modificar horario")
                 }
             }
 
             AnimatedVisibility(visible = isEditing) {
                 Column {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider(color = Color(0xFFF0F0F0))
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Sección Inicio
-                    Text(text = "Hora de inicio de ruta:", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = UPTColors.Vino)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color(0xFFF0F0F0))
+                    
+                    Text("Hora de salida:", fontSize = 13.sp, color = vinoUpt, fontWeight = FontWeight.Bold)
                     OutlinedTextField(
                         value = horaInicio,
                         onValueChange = { horaInicio = it },
-                        placeholder = { Text("Ej: 07:30") },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        singleLine = true,
+                        placeholder = { Text("07:00") },
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        TurnoSelector(
-                            text = "A.M.",
-                            isSelected = turnoInicio == "A.M.",
-                            onClick = { turnoInicio = "A.M." },
-                            modifier = Modifier.weight(1f)
-                        )
-                        TurnoSelector(
-                            text = "P.M.",
-                            isSelected = turnoInicio == "P.M.",
-                            onClick = { turnoInicio = "P.M." },
-                            modifier = Modifier.weight(1f)
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                        TurnoSelector("A.M.", turnoInicio == "A.M.", { turnoInicio = "A.M." }, Modifier.weight(1f))
+                        TurnoSelector("P.M.", turnoInicio == "P.M.", { turnoInicio = "P.M." }, Modifier.weight(1f))
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Sección Llegada
-                    Text(text = "Hora de llegada:", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = UPTColors.Vino)
+                    Text("Hora de llegada:", fontSize = 13.sp, color = vinoUpt, fontWeight = FontWeight.Bold)
                     OutlinedTextField(
                         value = horaLlegada,
                         onValueChange = { horaLlegada = it },
-                        placeholder = { Text("Ej: 08:30") },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        singleLine = true,
+                        placeholder = { Text("08:00") },
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        TurnoSelector(
-                            text = "A.M.",
-                            isSelected = turnoLlegada == "A.M.",
-                            onClick = { turnoLlegada = "A.M." },
-                            modifier = Modifier.weight(1f)
-                        )
-                        TurnoSelector(
-                            text = "P.M.",
-                            isSelected = turnoLlegada == "P.M.",
-                            onClick = { turnoLlegada = "P.M." },
-                            modifier = Modifier.weight(1f)
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                        TurnoSelector("A.M.", turnoLlegada == "A.M.", { turnoLlegada = "A.M." }, Modifier.weight(1f))
+                        TurnoSelector("P.M.", turnoLlegada == "P.M.", { turnoLlegada = "P.M." }, Modifier.weight(1f))
                     }
-
-                    Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
                         onClick = {
@@ -214,19 +169,10 @@ fun HorarioCard(chofer: Chofer, onSave: () -> Unit) {
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(48.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = UPTColors.Vino),
+                        colors = ButtonDefaults.buttonColors(containerColor = vinoUpt),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Guardar horario", fontWeight = FontWeight.Bold)
-                    }
-                    
-                    if (tieneHorario) {
-                        TextButton(
-                            onClick = { isEditing = false },
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
-                        ) {
-                            Text("Cancelar", color = Color.Gray)
-                        }
+                        Text("Guardar Horario")
                     }
                 }
             }
@@ -235,22 +181,14 @@ fun HorarioCard(chofer: Chofer, onSave: () -> Unit) {
 }
 
 @Composable
-fun TurnoSelector(
-    text: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val backgroundColor = if (isSelected) UPTColors.Vino else Color(0xFFF0F0F0)
-    val textColor = if (isSelected) Color.White else Color.Gray
-
-    Box(
-        modifier = modifier
-            .height(44.dp)
-            .background(backgroundColor, RoundedCornerShape(12.dp))
-            .clickable { onClick() },
-        contentAlignment = Alignment.Center
+fun TurnoSelector(text: String, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier) {
+    Surface(
+        modifier = modifier.height(40.dp).clickable { onClick() },
+        color = if (isSelected) UPTColors.Vino else Color(0xFFF0F0F0),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        Text(text = text, color = textColor, fontWeight = FontWeight.Bold)
+        Box(contentAlignment = Alignment.Center) {
+            Text(text, color = if (isSelected) Color.White else Color.Gray, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        }
     }
 }

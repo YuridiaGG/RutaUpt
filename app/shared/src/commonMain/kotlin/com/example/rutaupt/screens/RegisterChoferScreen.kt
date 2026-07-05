@@ -189,7 +189,15 @@ fun RegisterChoferScreen(
                         val response = authService.register(user)
                         isLoading = false
                         if (response.success) {
-                            SessionManager.iniciarSesion(nombre, email, "chofer")
+                            SessionManager.iniciarSesion(
+                                nombre = nombre,
+                                apellidos = apellidos,
+                                email = email,
+                                rol = "chofer",
+                                unidad = numeroUnidad,
+                                telefono = telefono,
+                                edad = edad
+                            )
                             getPlatform().showNotification("RutaUPT", "¡Bienvenido Chofer $nombre!")
                             onRegisterSuccess()
                         } else {

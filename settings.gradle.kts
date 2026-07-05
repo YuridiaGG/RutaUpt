@@ -37,4 +37,3 @@ if (!isRailway) {
 }
 
 include(":core")
-include(":server")

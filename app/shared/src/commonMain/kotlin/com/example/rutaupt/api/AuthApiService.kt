@@ -3,6 +3,7 @@ package com.example.rutaupt.api
 import com.example.rutaupt.model.*
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -29,13 +30,13 @@ class AuthApiService {
                 contentType(ContentType.Application.Json)
                 setBody(LoginRequest(email, pass))
             }
-            if (response.contentType()?.match(ContentType.Application.Json) == true) {
+            if (response.status.isSuccess() || response.status == HttpStatusCode.Unauthorized) {
                 response.body()
             } else {
-                LoginResponse(false, "Servidor: Error de autenticación (${response.status.value})")
+                LoginResponse(false, "Error: ${response.status.value}")
             }
         } catch (e: Exception) {
-            LoginResponse(false, "Error de conexión: Verifique su internet")
+            LoginResponse(false, "Error de conexión: ${e.message}")
         }
     }
 
@@ -45,13 +46,9 @@ class AuthApiService {
                 contentType(ContentType.Application.Json)
                 setBody(user)
             }
-            if (response.contentType()?.match(ContentType.Application.Json) == true) {
-                response.body()
-            } else {
-                RegisterResponse(false, "Error del servidor: El servicio de registro no respondió correctamente.")
-            }
+            response.body()
         } catch (e: Exception) {
-            RegisterResponse(false, "Fallo al comunicar con el servidor")
+            RegisterResponse(false, "Error de conexión")
         }
     }
 
@@ -61,30 +58,48 @@ class AuthApiService {
                 contentType(ContentType.Application.Json)
                 setBody(RecoveryRequest(email))
             }
-            if (response.contentType()?.match(ContentType.Application.Json) == true) {
+            if (response.status.isSuccess()) {
                 response.body()
             } else {
-                RegisterResponse(false, "Error: No se pudo procesar la recuperación (Status: ${response.status.value})")
+                val error = try { response.body<RegisterResponse>() } catch(e: Exception) { null }
+                RegisterResponse(false, error?.message ?: "Error al recuperar (${response.status.value})")
             }
         } catch (e: Exception) {
-            RegisterResponse(false, "Error de red al recuperar contraseña")
+            RegisterResponse(false, "Error de conexión: ${e.message}")
         }
     }
 
-    /**
-     * NUEVA FUNCIÓN: Trae los choferes desde Railway para el panel de administración
-     */
-    suspend fun obtenerChoferes(): List<User> {
+    suspend fun obtenerUsuariosPorRol(rol: String): List<User> {
         return try {
-            val response = client.get("$baseUrl/usuarios/choferes")
-            if (response.status == HttpStatusCode.OK) {
-                response.body()
+            val response = client.get("$baseUrl/admin/users/$rol")
+            if (response.status.isSuccess()) {
+                response.body<List<User>>()
             } else {
+                println("API_ERROR: Status ${response.status}")
                 emptyList()
             }
         } catch (e: Exception) {
-            println("Error al obtener choferes en AuthApiService: ${e.message}")
+            println("API_SERIALIZATION_ERROR: ${e.message}")
             emptyList()
+        }
+    }
+
+    suspend fun eliminarUsuario(id: Int): Boolean {
+        return try {
+            val response = client.delete("$baseUrl/admin/users/$id")
+            response.status.isSuccess()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun obtenerEstadisticasAdmin(): Map<String, Int> {
+        return try {
+            val response = client.get("$baseUrl/admin/stats")
+            if (response.status.isSuccess()) response.body()
+            else mapOf("estudiantes" to 0, "choferes" to 0, "rutas" to 0)
+        } catch (e: Exception) {
+            mapOf("estudiantes" to 0, "choferes" to 0, "rutas" to 0)
         }
     }
 }

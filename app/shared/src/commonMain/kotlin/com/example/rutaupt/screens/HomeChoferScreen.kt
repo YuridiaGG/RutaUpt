@@ -58,7 +58,7 @@ fun HomeChoferScreen(
         val horaStr = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')}"
         val fechaStr = "${now.dayOfMonth}/${now.monthNumber} $horaStr"
         
-        val unidad = "UPT-05"
+        val unidad = SessionManager.numeroUnidad.ifBlank { "Sin asignar" }
         val mensaje = if (imagen != null) "Unidad: $unidad reporta retraso con evidencia" else "Unidad: $unidad, esta: $estado"
         
         ReporteRepository.agregarReporte(
@@ -72,10 +72,6 @@ fun HomeChoferScreen(
             )
         )
         
-        if (estado != "En recorrido" && estado != "Fin de ruta") {
-            getPlatform().showNotification("RutaUPT Chofer", mensaje)
-        }
-
         historial.add(0, ChoferHistorialAccion("Ruta 05", estado, fechaStr, icono, color))
     }
 
@@ -102,14 +98,14 @@ fun HomeChoferScreen(
                         DropdownMenu(
                             expanded = showNotifications,
                             onDismissRequest = { showNotifications = false },
-                            modifier = Modifier.width(280.dp).background(Color.White)
+                            modifier = Modifier.width(300.dp).background(Color.White)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Notificaciones", fontWeight = FontWeight.Bold)
+                                Text("Avisos Recientes", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
                                 if (ReporteRepository.reportes.isNotEmpty()) {
                                     IconButton(
                                         onClick = { ReporteRepository.limpiarReportes() },
@@ -119,11 +115,11 @@ fun HomeChoferScreen(
                                     }
                                 }
                             }
-                            HorizontalDivider()
+                            HorizontalDivider(color = Color(0xFFF0F0F0))
                             if (ReporteRepository.reportes.isEmpty()) {
-                                Text("No hay notificaciones", modifier = Modifier.padding(16.dp), color = Color.Gray)
+                                Text("No hay avisos nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
                             } else {
-                                ReporteRepository.reportes.take(5).forEach { reporte ->
+                                ReporteRepository.reportes.take(10).forEach { reporte ->
                                     DropdownMenuItem(
                                         text = { 
                                             Column {
@@ -132,7 +128,13 @@ fun HomeChoferScreen(
                                             }
                                         },
                                         onClick = { showNotifications = false },
-                                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = vinoUpt) },
+                                        leadingIcon = { 
+                                            Icon(
+                                                if (reporte.tipo == ReporteTipo.ALERTA) Icons.Default.Warning else Icons.Default.BusAlert,
+                                                contentDescription = null, 
+                                                tint = if (reporte.tipo == ReporteTipo.ALERTA) Color.Red else vinoUpt
+                                            ) 
+                                        },
                                         trailingIcon = {
                                             IconButton(onClick = { ReporteRepository.eliminarReporte(reporte.id) }) {
                                                 Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
@@ -140,6 +142,9 @@ fun HomeChoferScreen(
                                         }
                                     )
                                 }
+                            }
+                            TextButton(onClick = { showNotifications = false; onVerReportes() }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Ver todos los reportes", color = vinoUpt)
                             }
                         }
                     }
@@ -249,7 +254,7 @@ fun ChoferInicioSection(
                     Spacer(Modifier.height(8.dp))
                     Text("Centro – UPT", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
                     Spacer(Modifier.height(4.dp))
-                    Text("Unidad: UPT-05", color = Color.Gray, fontSize = 14.sp)
+                    Text("Unidad: ${SessionManager.numeroUnidad.ifBlank { "N/A" }}", color = Color.Gray, fontSize = 14.sp)
                 }
             }
 
@@ -277,7 +282,6 @@ fun ChoferInicioSection(
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatusGridButton("Retrasada", Icons.Default.CameraAlt, Color(0xFFE67E22), Modifier.weight(1f)) {
-                    // Abrir cámara real
                     getPlatform().openCamera { img ->
                         onEstadoSelected("Retrasada (Validando)", Icons.Default.AccessTime, Color(0xFFE67E22), img)
                     }
@@ -316,23 +320,6 @@ fun ChoferInicioSection(
                     ChoferStopItem("Parada La Joya", "7:10 AM", false)
                     ChoferStopItem("Parada Las Flores", "7:18 AM", false)
                     ChoferStopItem("UPT", "7:30 AM", false, isLast = true, color = Color.Red)
-                }
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            Text(
-                text = "Reportes de estudiantes",
-                fontWeight = FontWeight.Bold,
-                fontSize = 19.sp,
-                color = Color.Black,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            if (ReporteRepository.reportes.isEmpty()) {
-                Text("Sin reportes nuevos", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(8.dp))
-            } else {
-                ReporteRepository.reportes.take(3).forEach { reporte ->
-                    ChoferReportCard(reporte.mensaje, reporte.tiempo, Icons.Default.Person)
                 }
             }
 
@@ -427,25 +414,6 @@ fun ChoferHistorialItem(accion: ChoferHistorialAccion) {
                 Text(accion.ruta, fontSize = 13.sp, color = Color.Gray)
             }
             Text(accion.fecha, color = Color.DarkGray, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-fun ChoferReportCard(text: String, time: String, icon: ImageVector) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(1.dp)
-    ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = Color.Gray, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(time, fontSize = 12.sp, color = Color.Gray)
-            }
         }
     }
 }

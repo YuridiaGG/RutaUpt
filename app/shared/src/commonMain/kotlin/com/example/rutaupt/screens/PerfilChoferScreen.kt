@@ -22,6 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rutaupt.getPlatform
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.api.RutaApiService
+import com.example.rutaupt.model.User
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,15 +34,18 @@ fun PerfilChoferScreen(
     onSaveSuccess: () -> Unit
 ) {
     val vinoUpt = UPTColors.Vino
+    val scope = rememberCoroutineScope()
+    val apiService = remember { RutaApiService() }
     
     var nombre by remember { mutableStateOf(SessionManager.nombreUsuario) }
+    var apellidos by remember { mutableStateOf(SessionManager.apellidosUsuario) }
     var email by remember { mutableStateOf(SessionManager.emailUsuario) }
-    var apellidos by remember { mutableStateOf("Pérez López") }
-    var edad by remember { mutableStateOf("35") }
-    var telefono by remember { mutableStateOf("775 987 6543") }
-    var numeroUnidad by remember { mutableStateOf("UPT-05") }
-    var password by remember { mutableStateOf("123") }
+    var edad by remember { mutableStateOf(SessionManager.edadUsuario) }
+    var telefono by remember { mutableStateOf(SessionManager.telefonoUsuario) }
+    var numeroUnidad by remember { mutableStateOf(SessionManager.numeroUnidad) }
+    var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -95,7 +101,8 @@ fun PerfilChoferScreen(
                 onValueChange = { nombre = it },
                 label = { Text("Nombre(s)") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             OutlinedTextField(
@@ -103,7 +110,8 @@ fun PerfilChoferScreen(
                 onValueChange = { apellidos = it },
                 label = { Text("Apellidos") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -112,14 +120,16 @@ fun PerfilChoferScreen(
                     onValueChange = { edad = it },
                     label = { Text("Edad") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isLoading
                 )
                 OutlinedTextField(
                     value = numeroUnidad,
                     onValueChange = { numeroUnidad = it },
                     label = { Text("N° Unidad") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isLoading
                 )
             }
 
@@ -129,7 +139,8 @@ fun PerfilChoferScreen(
                 label = { Text("Número de Teléfono") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Phone, null) },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             OutlinedTextField(
@@ -145,7 +156,7 @@ fun PerfilChoferScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Contraseña") },
+                label = { Text("Nueva Contraseña (opcional)") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
@@ -158,22 +169,51 @@ fun PerfilChoferScreen(
                     }
                 },
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
-                    SessionManager.nombreUsuario = nombre
-                    getPlatform().showNotification("RutaUPT", "¡Cambios guardados Chofer!")
-                    onSaveSuccess()
+                    isLoading = true
+                    scope.launch {
+                        val updatedUser = User(
+                            nombre = nombre,
+                            apellidos = apellidos,
+                            email = email,
+                            password = if (password.isNotBlank()) password else null,
+                            rol = SessionManager.rolUsuario,
+                            numeroUnidad = numeroUnidad,
+                            edad = edad,
+                            telefono = telefono
+                        )
+                        val success = apiService.actualizarUsuario(updatedUser)
+                        isLoading = false
+                        if (success) {
+                            SessionManager.nombreUsuario = nombre
+                            SessionManager.apellidosUsuario = apellidos
+                            SessionManager.edadUsuario = edad
+                            SessionManager.telefonoUsuario = telefono
+                            SessionManager.numeroUnidad = numeroUnidad
+                            getPlatform().showNotification("RutaUPT", "¡Perfil actualizado correctamente!")
+                            onSaveSuccess()
+                        } else {
+                            getPlatform().showNotification("RutaUPT", "Error al actualizar perfil")
+                        }
+                    }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
+                colors = ButtonDefaults.buttonColors(containerColor = vinoUpt),
+                enabled = !isLoading
             ) {
-                Text("Guardar Cambios", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                if (isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Guardar Cambios", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
 
             OutlinedButton(
@@ -183,7 +223,8 @@ fun PerfilChoferScreen(
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
+                enabled = !isLoading
             ) {
                 Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

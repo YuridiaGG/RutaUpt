@@ -1,15 +1,9 @@
 package com.example.rutaupt.screens
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
@@ -33,10 +27,11 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.painterResource
 import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.rememberBitmapFromBase64
-import com.example.rutaupt.model.ReporteUnidad
 import com.example.rutaupt.model.ReporteTipo
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.api.RutaApiService
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,10 +49,18 @@ fun HomeAdminScreen(
 ) {
     val vinoUpt = UPTColors.Vino
     val vinoOscuro = UPTColors.VinoOscuro
+    val apiService = remember { RutaApiService() }
+    
+    var stats by remember { mutableStateOf(mapOf("estudiantes" to 0, "choferes" to 0, "rutas" to 0)) }
     var showMenu by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var notificationsRead by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Cargar estadísticas reales desde el servidor al iniciar
+    LaunchedEffect(Unit) {
+        stats = apiService.obtenerEstadisticasAdmin()
+    }
 
     LaunchedEffect(mensajeConfirmacion) {
         mensajeConfirmacion?.let {
@@ -71,6 +74,7 @@ fun HomeAdminScreen(
             CenterAlignedTopAppBar(
                 title = { Text("Administrador", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 actions = {
+                    // Campana de Notificaciones
                     Box {
                         IconButton(onClick = { 
                             showNotifications = true 
@@ -83,7 +87,7 @@ fun HomeAdminScreen(
                                     }
                                 }
                             ) {
-                                Icon(Icons.Default.Notifications, contentDescription = "Notifications", tint = Color.White)
+                                Icon(Icons.Default.Notifications, contentDescription = "Notificaciones", tint = Color.White)
                             }
                         }
                         DropdownMenu(
@@ -96,23 +100,14 @@ fun HomeAdminScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    "Avisos Recientes",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = Color.Black
-                                )
+                                Text("Avisos Recientes", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
                                 if (ReporteRepository.reportes.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = { ReporteRepository.limpiarReportes() },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(Icons.Default.DeleteSweep, contentDescription = "Limpiar todo", tint = Color.Gray)
+                                    IconButton(onClick = { ReporteRepository.limpiarReportes() }, modifier = Modifier.size(24.dp)) {
+                                        Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = Color.Gray)
                                     }
                                 }
                             }
                             HorizontalDivider(color = Color(0xFFF0F0F0))
-                            
                             if (ReporteRepository.reportes.isEmpty()) {
                                 Text("No hay avisos nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
                             } else {
@@ -123,29 +118,18 @@ fun HomeAdminScreen(
                                         iconBg = if(reporte.tipo == ReporteTipo.ALERTA) Color.Red else Color(0xFFF39C12), 
                                         icon = if(reporte.tipo == ReporteTipo.ALERTA) Icons.Default.Warning else Icons.Default.BusAlert,
                                         imagenBase64 = reporte.imagen,
-                                        onClick = {
-                                            showNotifications = false
-                                            onVerReportes()
-                                        },
-                                        onDelete = {
-                                            ReporteRepository.eliminarReporte(reporte.id)
-                                        }
+                                        onClick = { showNotifications = false; onVerReportes() },
+                                        onDelete = { ReporteRepository.eliminarReporte(reporte.id) }
                                     )
                                 }
                             }
-                            
-                            TextButton(
-                                onClick = { 
-                                    showNotifications = false
-                                    onVerReportes()
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
+                            TextButton(onClick = { showNotifications = false; onVerReportes() }, modifier = Modifier.fillMaxWidth()) {
                                 Text("Ver todos los reportes", color = vinoUpt)
                             }
                         }
                     }
                     
+                    // Engrane de Configuración
                     Box {
                         IconButton(onClick = { showMenu = true }) {
                             Icon(Icons.Default.Settings, contentDescription = "Configuración", tint = Color.White)
@@ -157,20 +141,13 @@ fun HomeAdminScreen(
                         ) {
                             DropdownMenuItem(
                                 text = { Text("Mi Perfil", fontWeight = FontWeight.Medium) },
-                                onClick = {
-                                    showMenu = false
-                                    onConfiguracion()
-                                },
+                                onClick = { showMenu = false; onConfiguracion() },
                                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = vinoUpt) }
                             )
                             HorizontalDivider(color = Color(0xFFF0F0F0))
                             DropdownMenuItem(
                                 text = { Text("Cerrar Sesión", color = Color.Red, fontWeight = FontWeight.Medium) },
-                                onClick = {
-                                    showMenu = false
-                                    SessionManager.cerrarSesion()
-                                    onLogout()
-                                },
+                                onClick = { showMenu = false; SessionManager.cerrarSesion(); onLogout() },
                                 leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = Color.Red) }
                             )
                         }
@@ -185,11 +162,10 @@ fun HomeAdminScreen(
                     icon = { Icon(Icons.Default.Home, contentDescription = "Inicio") },
                     label = { Text("Inicio", fontSize = 10.sp) },
                     selected = true,
-                    onClick = {},
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = vinoUpt, indicatorColor = vinoUpt.copy(alpha = 0.1f))
+                    onClick = {}
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Map, contentDescription = "Ubicación Micros") },
+                    icon = { Icon(Icons.Default.Map, contentDescription = "Ubicación") },
                     label = { Text("Ubicación", fontSize = 10.sp) },
                     selected = false,
                     onClick = onUbicacionMicros
@@ -211,68 +187,51 @@ fun HomeAdminScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(Color(0xFFF5F5F5))
-                .verticalScroll(rememberScrollState())
+            modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFFF5F5F5)).verticalScroll(rememberScrollState())
         ) {
+            // Banner de bienvenida
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
                     .background(
                         brush = Brush.verticalGradient(colors = listOf(vinoUpt, vinoOscuro)),
-                        shape = RoundedCornerShape(bottomStart = 45.dp, bottomEnd = 0.dp)
+                        shape = RoundedCornerShape(bottomStart = 45.dp)
                     )
-                    .padding(horizontal = 24.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp)
                 ) {
                     Column(modifier = Modifier.weight(1.3f)) {
-                        Text(
-                            "¡Bienvenido,",
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            "${SessionManager.nombreUsuario}!",
-                            color = Color.White,
-                            fontSize = 19.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
+                        Text("¡Bienvenido,", color = Color.White.copy(alpha = 0.85f), fontSize = 16.sp)
+                        Text("${SessionManager.nombreUsuario}!", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
                     }
                     Image(
                         painter = painterResource(Res.drawable.admin),
-                        contentDescription = "Admin Mascot",
-                        modifier = Modifier
-                            .size(150.dp)
-                            .offset(y = 20.dp),
+                        contentDescription = null,
+                        modifier = Modifier.size(150.dp).offset(y = 20.dp),
                         contentScale = ContentScale.Fit
                     )
                 }
             }
 
             Column(modifier = Modifier.padding(20.dp)) {
-                SectionHeader("Resumen General")
-                Spacer(modifier = Modifier.height(16.dp))
+                Text("Resumen General", fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Color(0xFF333333))
+                Spacer(Modifier.height(16.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    StatCard("1,248", "Estudiantes registrados", Icons.Default.Group, Modifier.weight(1f))
-                    StatCard("${com.example.rutaupt.storage.ChoferRepository.choferes.size}", "Choferes registrados", Icons.Default.Badge, Modifier.weight(1f))
+                    StatCard("${stats["estudiantes"]}", "Estudiantes registrados", Icons.Default.Group, Modifier.weight(1f))
+                    StatCard("${stats["choferes"]}", "Choferes registrados", Icons.Default.Badge, Modifier.weight(1f))
                 }
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(Modifier.height(14.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    StatCard("18", "Rutas activas", Icons.Default.DirectionsBus, Modifier.weight(1f))
-                    StatCard("${ReporteRepository.reportes.size}", "Reportes totales", Icons.Default.Warning, Modifier.weight(1f), iconColor = Color(0xFFE74C3C))
+                    StatCard("${stats["rutas"]}", "Rutas activas", Icons.Default.DirectionsBus, Modifier.weight(1f))
+                    StatCard("${ReporteRepository.reportes.size}", "Reportes totales", Icons.Default.Warning, Modifier.weight(1f), Color(0xFFE74C3C))
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
-
-                SectionHeader("Accesos rápidos")
+                Text("Accesos rápidos", fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Color(0xFF333333))
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -280,51 +239,20 @@ fun HomeAdminScreen(
                     QuickActionCard("Gestionar Choferes", Icons.Default.Person, Modifier.weight(1f), onClick = onGestionarChoferes)
                 }
                 Spacer(modifier = Modifier.height(14.dp))
-                
-                QuickActionCard(
-                    title = "Gestionar Estudiantes",
-                    icon = Icons.Default.School,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onGestionarEstudiantes
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-                
-                Button(
-                    onClick = onVerReportes,
-                    modifier = Modifier.fillMaxWidth().height(58.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
-                ) {
-                    Icon(Icons.Default.Assessment, contentDescription = null, tint = Color.White)
-                    Spacer(Modifier.width(12.dp))
-                    Text("Ver Reportes de Unidades", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                }
+                QuickActionCard("Gestionar Estudiantes", Icons.Default.School, Modifier.fillMaxWidth(), onClick = onGestionarEstudiantes)
 
                 Spacer(modifier = Modifier.height(32.dp))
-
-                SectionHeader("Actividad semanal")
+                Text("Actividad semanal", fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Color(0xFF333333))
                 Spacer(modifier = Modifier.height(16.dp))
                 ActivityChart()
-
-                Spacer(modifier = Modifier.height(30.dp))
+                Spacer(Modifier.height(30.dp))
             }
         }
     }
 }
 
 @Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        fontWeight = FontWeight.Bold,
-        fontSize = 19.sp,
-        color = Color(0xFF333333)
-    )
-}
-
-@Composable
-private fun StatCard(value: String, label: String, icon: ImageVector, modifier: Modifier, iconColor: Color = UPTColors.Vino) {
+fun StatCard(value: String, label: String, icon: ImageVector, modifier: Modifier, iconColor: Color = UPTColors.Vino) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
@@ -341,19 +269,15 @@ private fun StatCard(value: String, label: String, icon: ImageVector, modifier: 
 }
 
 @Composable
-private fun QuickActionCard(title: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit = {}) {
+fun QuickActionCard(title: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
     Card(
         modifier = modifier.height(115.dp).clickable { onClick() },
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = UPTColors.Vino, modifier = Modifier.size(38.dp))
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Icon(icon, null, tint = UPTColors.Vino, modifier = Modifier.size(38.dp))
             Spacer(modifier = Modifier.height(12.dp))
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF444444), textAlign = TextAlign.Center)
         }
@@ -361,79 +285,9 @@ private fun QuickActionCard(title: String, icon: ImageVector, modifier: Modifier
 }
 
 @Composable
-private fun RecentNotificationItem(
-    mensaje: String, 
-    tiempo: String, 
-    iconBg: Color, 
-    icon: ImageVector,
-    imagenBase64: String? = null,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (!imagenBase64.isNullOrEmpty()) {
-                val bitmap = rememberBitmapFromBase64(imagenBase64)
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap,
-                        contentDescription = "Miniatura",
-                        modifier = Modifier
-                            .size(42.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(1.dp, Color.LightGray, RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier.size(42.dp).background(iconBg.copy(alpha = 0.12f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(icon, contentDescription = null, tint = iconBg, modifier = Modifier.size(20.dp))
-                    }
-                }
-            } else {
-                Box(
-                    modifier = Modifier.size(42.dp).background(iconBg.copy(alpha = 0.12f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(icon, contentDescription = null, tint = iconBg, modifier = Modifier.size(20.dp))
-                }
-            }
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black, maxLines = 1)
-                Text(tiempo, fontSize = 10.sp, color = Color.Gray)
-            }
-            Row {
-                if (!imagenBase64.isNullOrEmpty()) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.Gray.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(8.dp))
-                }
-                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ActivityChart() {
+fun ActivityChart() {
     val vinoUpt = UPTColors.Vino
-    val chartData = listOf(0.3f, 0.6f, 0.2f, 0.4f, 0.9f, 0.5f, 0.7f)
+    val chartData = listOf(0f, 0f, 0f, 0f, 0f, 0f, 0f)
     val days = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 
     Card(
@@ -447,32 +301,43 @@ private fun ActivityChart() {
                 val width = size.width
                 val height = size.height
                 val spacing = width / (chartData.size - 1)
-                
                 val path = Path()
                 chartData.forEachIndexed { index, value ->
                     val x = index * spacing
                     val y = height - (value * height)
                     if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
-
-                drawPath(
-                    path = path,
-                    color = vinoUpt,
-                    style = Stroke(width = 4.dp.toPx())
-                )
-
-                chartData.forEachIndexed { index, value ->
-                    val x = index * spacing
-                    val y = height - (value * height)
-                    drawCircle(color = vinoUpt, radius = 6.dp.toPx(), center = Offset(x, y))
-                    drawCircle(color = Color.White, radius = 2.5.dp.toPx(), center = Offset(x, y))
-                }
+                drawPath(path = path, color = vinoUpt, style = Stroke(width = 4.dp.toPx()))
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                days.forEach { day ->
-                    Text(day, fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
-                }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                days.forEach { Text(it, fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+}
+
+@Composable
+fun RecentNotificationItem(
+    mensaje: String, tiempo: String, iconBg: Color, icon: ImageVector,
+    imagenBase64: String? = null, onClick: () -> Unit, onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA))
+    ) {
+        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp).background(iconBg.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = iconBg, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black, maxLines = 1)
+                Text(tiempo, fontSize = 10.sp, color = Color.Gray)
+            }
+            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Default.Delete, null, tint = Color.LightGray, modifier = Modifier.size(18.dp))
             }
         }
     }
