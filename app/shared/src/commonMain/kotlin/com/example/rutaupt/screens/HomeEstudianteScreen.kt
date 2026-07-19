@@ -32,11 +32,13 @@ import androidx.compose.ui.unit.sp
 import com.example.rutaupt.TrackingService
 import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.getPlatform
+import com.example.rutaupt.LocationBridge
 import com.example.rutaupt.model.ReporteUnidad
 import com.example.rutaupt.model.ReporteTipo
 import com.example.rutaupt.storage.ChoferRepository
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.storage.ParadaRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -55,8 +57,21 @@ fun HomeEstudianteScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     
+    // Verificación de permisos para el Estudiante
+    var hasLocationPermission by remember { 
+        mutableStateOf(LocationBridge.hasPermission?.invoke() ?: false) 
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasLocationPermission) {
+            LocationBridge.onRequestPermission?.invoke { granted ->
+                hasLocationPermission = granted
+            }
+        }
+        ParadaRepository.cargarParadas()
+    }
+
     var showNotifications by remember { mutableStateOf(false) }
-    
     var lastSeenNotificationCount by remember { mutableStateOf(0) }
     val currentNotificationCount = ReporteRepository.reportes.size
     val hasNewNotifications = currentNotificationCount > lastSeenNotificationCount
@@ -111,7 +126,9 @@ fun HomeEstudianteScreen(
                             if (ReporteRepository.reportes.isEmpty()) {
                                 Text("No hay avisos nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
                             } else {
-                                ReporteRepository.reportes.take(5).forEach { reporte ->
+                                ReporteRepository.reportes.filter { 
+                                    it.estado == "Unidad llena" || it.estado == "Disponible" 
+                                }.take(5).forEach { reporte ->
                                     DropdownMenuItem(
                                         text = { 
                                             Column {
@@ -170,7 +187,7 @@ fun HomeEstudianteScreen(
         ) {
             AnimatedContent(targetState = selectedTab) { tab ->
                 when (tab) {
-                    "Inicio" -> InicioSection(vinoUpt, vinoOscuro, onNavigateToRuta) { mensaje ->
+                    "Inicio" -> InicioSection(vinoUpt, vinoOscuro, hasLocationPermission, onNavigateToRuta) { mensaje ->
                         if (SessionManager.puedeEnviarReporte()) {
                             scope.launch {
                                 val nuevoReporte = ReporteUnidad(
@@ -198,7 +215,7 @@ fun HomeEstudianteScreen(
 }
 
 @Composable
-fun InicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: () -> Unit, onSendReport: (String) -> Unit) {
+fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onNavigateToRuta: () -> Unit, onSendReport: (String) -> Unit) {
     val trackingService = remember { TrackingService() }
     
     val userLat = 20.0820
@@ -329,25 +346,31 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: () -> Uni
                 elevation = CardDefaults.cardElevation(4.dp)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    MapComponent(
-                        modifier = Modifier.fillMaxSize(),
-                        latitude = unidadMasCercana.second,
-                        longitude = unidadMasCercana.third,
-                        title = "Unidad ${unidadMasCercana.first}"
-                    )
-                    
-                    Surface(
-                        color = Color.White.copy(alpha = 0.9f),
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier.padding(12.dp).align(Alignment.TopStart).shadow(2.dp, RoundedCornerShape(20.dp))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    if (hasPermission) {
+                        MapComponent(
+                            modifier = Modifier.fillMaxSize(),
+                            latitude = unidadMasCercana.second,
+                            longitude = unidadMasCercana.third,
+                            title = "Unidad ${unidadMasCercana.first}"
+                        )
+                        
+                        Surface(
+                            color = Color.White.copy(alpha = 0.9f),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.padding(12.dp).align(Alignment.TopStart).shadow(2.dp, RoundedCornerShape(20.dp))
                         ) {
-                            Box(modifier = Modifier.size(8.dp).background(Color(0xFF4CAF50), CircleShape))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Micro ${unidadMasCercana.first} en vivo", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(modifier = Modifier.size(8.dp).background(Color(0xFF4CAF50), CircleShape))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Micro ${unidadMasCercana.first} en vivo", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                            }
+                        }
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize().background(Color.LightGray), contentAlignment = Alignment.Center) {
+                            Text("Se requiere permiso de ubicación", color = Color.DarkGray)
                         }
                     }
                 }
@@ -360,10 +383,20 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: () -> Uni
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    StopItem("Centro", "7:00 AM", isFirst = true, color = Color.Red)
-                    StopItem("Parada La Joya", "7:10 AM")
-                    StopItem("Parada Las Flores", "7:18 AM")
-                    StopItem("UPT", "7:30 AM", isLast = true, color = Color.Black)
+                    val paradas = ParadaRepository.paradas
+                    if (paradas.isEmpty()) {
+                        Text("No hay paradas registradas", color = Color.Gray, fontSize = 14.sp)
+                    } else {
+                        paradas.forEachIndexed { index, parada ->
+                            StopItem(
+                                name = parada,
+                                time = "--:--",
+                                isFirst = index == 0,
+                                isLast = index == paradas.size - 1,
+                                color = if (index == 0) Color.Red else if (index == paradas.size - 1) Color.Black else Color.Gray
+                            )
+                        }
+                    }
                 }
             }
 

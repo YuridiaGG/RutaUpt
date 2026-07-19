@@ -8,13 +8,40 @@ import com.example.rutaupt.storage.SessionManager
 
 @Composable
 fun App() {
-    // Para persistencia simple en esta demo, inicializamos con el rol si ya existe
-    // En una app real usaríamos Settings o DataStore
     var pantallaActual by remember { 
         mutableStateOf(if (SessionManager.rolUsuario.isNotEmpty()) SessionManager.rolUsuario.lowercase() else "login") 
     }
     var choferSeleccionado by remember { mutableStateOf<Chofer?>(null) }
     var adminMessage by remember { mutableStateOf<String?>(null) }
+
+    // Manejo del botón atrás del sistema
+    BackHandler(enabled = pantallaActual != "login") {
+        when (pantallaActual) {
+            "admin", "chofer", "estudiante" -> {
+                // Si está en el home de cualquier rol, vuelve al login (cerrar sesión)
+                pantallaActual = "login"
+            }
+            "lista_choferes", "gestionar_horarios", "lista_estudiantes", 
+            "ubicacion_micros", "gestionar_paradas", "perfil_admin", "reportes_unidades" -> {
+                pantallaActual = "admin"
+            }
+            "formulario_chofer" -> {
+                pantallaActual = "lista_choferes"
+            }
+            "perfil_chofer", "reportes_estudiantes_chofer" -> {
+                pantallaActual = "chofer"
+            }
+            "perfil_estudiante", "ruta" -> {
+                pantallaActual = "estudiante"
+            }
+            "registro_seleccion", "forgot_password" -> {
+                pantallaActual = "login"
+            }
+            "registro_estudiante", "registro_chofer" -> {
+                pantallaActual = "registro_seleccion"
+            }
+        }
+    }
 
     MaterialTheme {
         when (pantallaActual) {

@@ -7,7 +7,14 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+
+@Serializable
+data class Parada(
+    val id: Int? = null,
+    val nombre: String
+)
 
 class RutaApiService {
 
@@ -26,6 +33,7 @@ class RutaApiService {
         }
     }
 
+    // --- Usuarios ---
     suspend fun obtenerUsuariosPorRol(rol: String): List<User> {
         return try {
             val response = client.get("$BASE_URL/api/admin/users/$rol")
@@ -52,6 +60,43 @@ class RutaApiService {
         }
     }
 
+    // --- Paradas ---
+    suspend fun obtenerParadas(): List<String> {
+        return try {
+            val response = client.get("$BASE_URL/api/paradas")
+            if (response.status.isSuccess()) {
+                val paradasBody = response.body<List<Parada>>()
+                paradasBody.map { it.nombre }
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    suspend fun agregarParada(nombre: String): Boolean {
+        return try {
+            val response = client.post("$BASE_URL/api/paradas") {
+                contentType(ContentType.Application.Json)
+                setBody(Parada(nombre = nombre))
+            }
+            response.status.isSuccess()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun eliminarParada(nombre: String): Boolean {
+        return try {
+            val response = client.delete("$BASE_URL/api/paradas/$nombre")
+            response.status.isSuccess()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    // --- Otros ---
     suspend fun eliminarUsuario(id: Int): Boolean {
         return try {
             val response = client.delete("$BASE_URL/api/admin/users/$id")
@@ -63,7 +108,7 @@ class RutaApiService {
 
     suspend fun actualizarUsuario(user: User): Boolean {
         return try {
-            val response = client.post("$BASE_URL/api/auth/update") { // Cambiado a un endpoint de actualización si existe
+            val response = client.post("$BASE_URL/api/auth/update") {
                 contentType(ContentType.Application.Json)
                 setBody(user)
             }

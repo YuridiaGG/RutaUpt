@@ -16,18 +16,25 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.painterResource
 import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.getPlatform
+import com.example.rutaupt.LocationBridge
+import com.example.rutaupt.CameraBridge
 import com.example.rutaupt.model.ReporteUnidad
 import com.example.rutaupt.model.ReporteTipo
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.storage.ParadaRepository
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.coroutines.launch
 
 data class ChoferHistorialAccion(
     val ruta: String,
@@ -53,13 +60,22 @@ fun HomeChoferScreen(
     var showNotifications by remember { mutableStateOf(false) }
     var notificationsRead by remember { mutableStateOf(false) }
 
+    // Solicitar permisos de Ubicación y Cámara EN CADENA al iniciar (específico para Chofer)
+    LaunchedEffect(Unit) {
+        LocationBridge.onRequestPermission?.invoke { _ ->
+            // Una vez que responde a ubicacion, pedimos camara inmediatamente
+            CameraBridge.onRequestPermission?.invoke { _ -> }
+        }
+        ParadaRepository.cargarParadas()
+    }
+
     fun registrarEstado(estado: String, icono: ImageVector, color: Color, imagen: String? = null) {
         val now = kotlinx.datetime.Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
         val horaStr = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')}"
         val fechaStr = "${now.dayOfMonth}/${now.monthNumber} $horaStr"
         
         val unidad = SessionManager.numeroUnidad.ifBlank { "Sin asignar" }
-        val mensaje = if (imagen != null) "Unidad: $unidad reporta retraso con evidencia" else "Unidad: $unidad, esta: $estado"
+        val mensaje = if (imagen != null) "Unidad $unidad reporta retraso con evidencia" else "Unidad $unidad: $estado"
         
         ReporteRepository.agregarReporte(
             ReporteUnidad(
@@ -68,11 +84,30 @@ fun HomeChoferScreen(
                 tiempo = fechaStr, 
                 tipo = if (imagen != null) ReporteTipo.ALERTA else ReporteTipo.INFORMACION,
                 imagen = imagen,
-                estado = estado
+                estado = "EstadoChofer_$estado" // Marcador para que el chofer no vea sus propios estados
             )
         )
         
         historial.add(0, ChoferHistorialAccion("Ruta 05", estado, fechaStr, icono, color))
+    }
+
+    // Filtrado de notificaciones para el chofer
+    val notificacionesChofer = ReporteRepository.reportes.filter { reporte ->
+        reporte.unidad == SessionManager.numeroUnidad && (
+            reporte.estado == "HorarioAsignado" || 
+            (reporte.estado == null || !reporte.estado!!.startsWith("EstadoChofer_"))
+        )
+    }
+
+    // Sincronizar el horario del SessionManager si llega una notificación de horario
+    LaunchedEffect(ReporteRepository.reportes.size) {
+        val ultimoHorario = ReporteRepository.reportes.find { 
+            it.unidad == SessionManager.numeroUnidad && it.estado == "HorarioAsignado" 
+        }
+        ultimoHorario?.let {
+            val nuevoHorario = it.mensaje.substringAfter(": ").trim()
+            SessionManager.horarioUsuario = nuevoHorario
+        }
     }
 
     Scaffold(
@@ -87,8 +122,8 @@ fun HomeChoferScreen(
                         }) {
                             BadgedBox(
                                 badge = { 
-                                    if (ReporteRepository.reportes.isNotEmpty() && !notificationsRead) {
-                                        Badge { Text(ReporteRepository.reportes.size.toString()) }
+                                    if (notificacionesChofer.isNotEmpty() && !notificationsRead) {
+                                        Badge { Text(notificacionesChofer.size.toString()) }
                                     }
                                 }
                             ) {
@@ -106,20 +141,12 @@ fun HomeChoferScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("Avisos Recientes", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                                if (ReporteRepository.reportes.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = { ReporteRepository.limpiarReportes() },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(Icons.Default.DeleteSweep, contentDescription = "Limpiar todo", tint = Color.Gray)
-                                    }
-                                }
                             }
                             HorizontalDivider(color = Color(0xFFF0F0F0))
-                            if (ReporteRepository.reportes.isEmpty()) {
+                            if (notificacionesChofer.isEmpty()) {
                                 Text("No hay avisos nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
                             } else {
-                                ReporteRepository.reportes.take(10).forEach { reporte ->
+                                notificacionesChofer.take(10).forEach { reporte ->
                                     DropdownMenuItem(
                                         text = { 
                                             Column {
@@ -130,21 +157,13 @@ fun HomeChoferScreen(
                                         onClick = { showNotifications = false },
                                         leadingIcon = { 
                                             Icon(
-                                                if (reporte.tipo == ReporteTipo.ALERTA) Icons.Default.Warning else Icons.Default.BusAlert,
+                                                if (reporte.estado == "HorarioAsignado") Icons.Default.Schedule else Icons.Default.School,
                                                 contentDescription = null, 
-                                                tint = if (reporte.tipo == ReporteTipo.ALERTA) Color.Red else vinoUpt
+                                                tint = vinoUpt
                                             ) 
-                                        },
-                                        trailingIcon = {
-                                            IconButton(onClick = { ReporteRepository.eliminarReporte(reporte.id) }) {
-                                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
-                                            }
                                         }
                                     )
                                 }
-                            }
-                            TextButton(onClick = { showNotifications = false; onVerReportes() }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Ver todos los reportes", color = vinoUpt)
                             }
                         }
                     }
@@ -251,8 +270,24 @@ fun ChoferInicioSection(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text("Centro – UPT", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
+                    Spacer(Modifier.height(12.dp))
+                    
+                    // Horario colocado en el espacio en blanco al lado de Centro - UPT
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = buildAnnotatedString {
+                                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp)) {
+                                    append("Centro – UPT")
+                                }
+                                append("   ") // Espacio solicitado
+                                withStyle(style = SpanStyle(color = vinoUpt, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)) {
+                                    append("🕒 ${SessionManager.horarioUsuario}")
+                                }
+                            },
+                            color = Color.Black
+                        )
+                    }
+                    
                     Spacer(Modifier.height(4.dp))
                     Text("Unidad: ${SessionManager.numeroUnidad.ifBlank { "N/A" }}", color = Color.Gray, fontSize = 14.sp)
                 }
@@ -283,7 +318,7 @@ fun ChoferInicioSection(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatusGridButton("Retrasada", Icons.Default.CameraAlt, Color(0xFFE67E22), Modifier.weight(1f)) {
                     getPlatform().openCamera { img ->
-                        onEstadoSelected("Retrasada (Validando)", Icons.Default.AccessTime, Color(0xFFE67E22), img)
+                        onEstadoSelected("Retrasada", Icons.Default.AccessTime, Color(0xFFE67E22), img)
                     }
                 }
                 StatusGridButton("Unidad llena", Icons.Default.Groups, Color(0xFFE67E22), Modifier.weight(1f)) {
@@ -316,27 +351,20 @@ fun ChoferInicioSection(
                 elevation = CardDefaults.cardElevation(2.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    ChoferStopItem("Centro", "7:00 AM", true, isFirst = true)
-                    ChoferStopItem("Parada La Joya", "7:10 AM", false)
-                    ChoferStopItem("Parada Las Flores", "7:18 AM", false)
-                    ChoferStopItem("UPT", "7:30 AM", false, isLast = true, color = Color.Red)
-                }
-            }
-
-            Spacer(Modifier.height(32.dp))
-
-            Text(
-                text = "Historial reciente",
-                fontWeight = FontWeight.Bold,
-                fontSize = 19.sp,
-                color = Color.Black,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            if (historial.isEmpty()) {
-                Text("Presione un estado para ver historial", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(8.dp))
-            } else {
-                historial.forEach { accion ->
-                    ChoferHistorialItem(accion)
+                    val paradas = ParadaRepository.paradas
+                    if (paradas.isEmpty()) {
+                        Text("No hay paradas asignadas", color = Color.Gray)
+                    } else {
+                        paradas.forEachIndexed { index, parada ->
+                            ChoferStopItem(
+                                name = parada, 
+                                time = "--:--", 
+                                active = false, 
+                                isFirst = index == 0,
+                                isLast = index == paradas.size - 1
+                            )
+                        }
+                    }
                 }
             }
 
@@ -347,13 +375,27 @@ fun ChoferInicioSection(
 
 @Composable
 fun ChoferMapaSection(vinoUpt: Color) {
+    val hasLocationPermission = LocationBridge.hasPermission?.invoke() ?: false
+
     Box(modifier = Modifier.fillMaxSize()) {
-        MapComponent(
-            modifier = Modifier.fillMaxSize(),
-            latitude = 20.0820,
-            longitude = -98.3680,
-            title = "Mi Ubicación"
-        )
+        if (hasLocationPermission) {
+            MapComponent(
+                modifier = Modifier.fillMaxSize(),
+                latitude = 20.0820,
+                longitude = -98.3680,
+                title = "Mi Ubicación"
+            )
+        } else {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Permiso de ubicación requerido para ver el mapa", color = Color.Gray)
+                    Button(onClick = { LocationBridge.onRequestPermission?.invoke {} }) {
+                        Text("Solicitar Permiso")
+                    }
+                }
+            }
+        }
+        
         Column(
             modifier = Modifier.fillMaxSize().padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -366,7 +408,7 @@ fun ChoferMapaSection(vinoUpt: Color) {
                 Row(modifier = Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.MyLocation, null, tint = Color(0xFF2196F3))
                     Spacer(Modifier.width(12.dp))
-                    Text("GPS en tiempo real activo...", color = Color.Gray, fontWeight = FontWeight.Medium)
+                    Text(if (hasLocationPermission) "GPS en tiempo real activo..." else "Esperando permisos...", color = Color.Gray, fontWeight = FontWeight.Medium)
                 }
             }
         }

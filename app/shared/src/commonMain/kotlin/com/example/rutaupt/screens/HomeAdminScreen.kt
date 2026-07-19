@@ -27,9 +27,11 @@ import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.painterResource
 import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.rememberBitmapFromBase64
+import com.example.rutaupt.LocationBridge
 import com.example.rutaupt.model.ReporteTipo
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.storage.ParadaRepository
 import com.example.rutaupt.api.RutaApiService
 import kotlinx.coroutines.launch
 
@@ -57,9 +59,19 @@ fun HomeAdminScreen(
     var notificationsRead by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Cargar estadísticas reales desde el servidor al iniciar
+    // Verificación de permisos para el Admin (Geolocation)
+    var hasLocationPermission by remember { 
+        mutableStateOf(LocationBridge.hasPermission?.invoke() ?: false) 
+    }
+
     LaunchedEffect(Unit) {
+        if (!hasLocationPermission) {
+            LocationBridge.onRequestPermission?.invoke { granted ->
+                hasLocationPermission = granted
+            }
+        }
         stats = apiService.obtenerEstadisticasAdmin()
+        ParadaRepository.cargarParadas()
     }
 
     LaunchedEffect(mensajeConfirmacion) {
@@ -69,12 +81,16 @@ fun HomeAdminScreen(
         }
     }
 
+    // Filtro de Notificaciones para Admin: Estados operativos de los choferes
+    val notificacionesAdmin = ReporteRepository.reportes.filter { 
+        it.estado != null && it.estado!!.startsWith("EstadoChofer_") 
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Administrador", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp) },
                 actions = {
-                    // Campana de Notificaciones
                     Box {
                         IconButton(onClick = { 
                             showNotifications = true 
@@ -82,8 +98,8 @@ fun HomeAdminScreen(
                         }) {
                             BadgedBox(
                                 badge = { 
-                                    if (ReporteRepository.reportes.isNotEmpty() && !notificationsRead) {
-                                        Badge { Text(ReporteRepository.reportes.size.toString()) }
+                                    if (notificacionesAdmin.isNotEmpty() && !notificationsRead) {
+                                        Badge { Text(notificacionesAdmin.size.toString()) }
                                     }
                                 }
                             ) {
@@ -100,18 +116,13 @@ fun HomeAdminScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("Avisos Recientes", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
-                                if (ReporteRepository.reportes.isNotEmpty()) {
-                                    IconButton(onClick = { ReporteRepository.limpiarReportes() }, modifier = Modifier.size(24.dp)) {
-                                        Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = Color.Gray)
-                                    }
-                                }
+                                Text("Estados de Unidades", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.Black)
                             }
                             HorizontalDivider(color = Color(0xFFF0F0F0))
-                            if (ReporteRepository.reportes.isEmpty()) {
-                                Text("No hay avisos nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
+                            if (notificacionesAdmin.isEmpty()) {
+                                Text("No hay reportes de choferes", modifier = Modifier.padding(16.dp), color = Color.Gray)
                             } else {
-                                ReporteRepository.reportes.take(5).forEach { reporte ->
+                                notificacionesAdmin.take(10).forEach { reporte ->
                                     RecentNotificationItem(
                                         mensaje = reporte.mensaje, 
                                         tiempo = reporte.tiempo, 
@@ -124,12 +135,11 @@ fun HomeAdminScreen(
                                 }
                             }
                             TextButton(onClick = { showNotifications = false; onVerReportes() }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Ver todos los reportes", color = vinoUpt)
+                                Text("Ver historial completo", color = vinoUpt)
                             }
                         }
                     }
                     
-                    // Engrane de Configuración
                     Box {
                         IconButton(onClick = { showMenu = true }) {
                             Icon(Icons.Default.Settings, contentDescription = "Configuración", tint = Color.White)
@@ -189,7 +199,6 @@ fun HomeAdminScreen(
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFFF5F5F5)).verticalScroll(rememberScrollState())
         ) {
-            // Banner de bienvenida
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -227,23 +236,23 @@ fun HomeAdminScreen(
                 Spacer(Modifier.height(14.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     StatCard("${stats["rutas"]}", "Rutas activas", Icons.Default.DirectionsBus, Modifier.weight(1f))
-                    StatCard("${ReporteRepository.reportes.size}", "Reportes totales", Icons.Default.Warning, Modifier.weight(1f), Color(0xFFE74C3C))
+                    StatCard("${notificacionesAdmin.size}", "Reportes de choferes", Icons.Default.Warning, Modifier.weight(1f), Color(0xFFE74C3C))
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
                 Text("Accesos rápidos", fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Color(0xFF333333))
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     QuickActionCard("Gestionar Horarios", Icons.Default.Schedule, Modifier.weight(1f), onClick = onGestionarHorarios)
                     QuickActionCard("Gestionar Choferes", Icons.Default.Person, Modifier.weight(1f), onClick = onGestionarChoferes)
                 }
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(Modifier.height(14.dp))
                 QuickActionCard("Gestionar Estudiantes", Icons.Default.School, Modifier.fillMaxWidth(), onClick = onGestionarEstudiantes)
 
                 Spacer(modifier = Modifier.height(32.dp))
                 Text("Actividad semanal", fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Color(0xFF333333))
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(16.dp))
                 ActivityChart()
                 Spacer(Modifier.height(30.dp))
             }

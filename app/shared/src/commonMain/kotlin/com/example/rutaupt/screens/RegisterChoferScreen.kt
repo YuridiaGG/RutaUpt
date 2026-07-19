@@ -193,6 +193,7 @@ fun RegisterChoferScreen(
                                 nombre = nombre,
                                 apellidos = apellidos,
                                 email = email,
+                                password = password, // Guardamos la contraseña en sesión
                                 rol = "chofer",
                                 unidad = numeroUnidad,
                                 telefono = telefono,

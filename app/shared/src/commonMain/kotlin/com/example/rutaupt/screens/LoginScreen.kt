@@ -190,10 +190,12 @@ fun LoginScreen(
                                         nombre = user.nombre,
                                         apellidos = user.apellidos,
                                         email = user.email,
+                                        password = password.trim(), 
                                         rol = user.rol,
                                         unidad = user.numeroUnidad,
                                         telefono = user.telefono,
-                                        edad = user.edad
+                                        edad = user.edad,
+                                        horario = user.horario // Capturamos el horario de la BD
                                     )
                                     getPlatform().showNotification("RutaUPT", "¡Hola ${user.nombre}!")
                                     onLoginSuccess(user.rol.lowercase())

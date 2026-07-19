@@ -22,6 +22,12 @@ class AuthApiService {
                 isLenient = true
             })
         }
+        // Agregamos tiempo de espera extendido para el envío de correos
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60000 // 60 segundos
+            connectTimeoutMillis = 15000
+            socketTimeoutMillis = 60000
+        }
     }
 
     suspend fun login(email: String, pass: String): LoginResponse {
@@ -65,7 +71,7 @@ class AuthApiService {
                 RegisterResponse(false, error?.message ?: "Error al recuperar (${response.status.value})")
             }
         } catch (e: Exception) {
-            RegisterResponse(false, "Error de conexión: ${e.message}")
+            RegisterResponse(false, "Error de conexión o tiempo excedido. El servidor tardó demasiado en enviar el correo.")
         }
     }
 
@@ -75,11 +81,9 @@ class AuthApiService {
             if (response.status.isSuccess()) {
                 response.body<List<User>>()
             } else {
-                println("API_ERROR: Status ${response.status}")
                 emptyList()
             }
         } catch (e: Exception) {
-            println("API_SERIALIZATION_ERROR: ${e.message}")
             emptyList()
         }
     }

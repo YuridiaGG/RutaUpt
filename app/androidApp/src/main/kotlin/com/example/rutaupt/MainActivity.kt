@@ -3,14 +3,12 @@ package com.example.rutaupt
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.os.Build
 import android.os.Bundle
 import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
@@ -20,6 +18,8 @@ import java.io.ByteArrayOutputStream
 class MainActivity : ComponentActivity() {
     
     private var cameraCallback: ((String) -> Unit)? = null
+    private var locationPermissionCallback: ((Boolean) -> Unit)? = null
+    private var cameraPermissionCallback: ((Boolean) -> Unit)? = null
 
     private val takePictureLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
@@ -31,21 +31,30 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun encodeBitmapToBase64(bitmap: Bitmap): String {
-        val outputStream = ByteArrayOutputStream()
-        // Calidad 70 para buen balance entre visibilidad y tamaño
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
-        val byteArray = outputStream.toByteArray()
-        // NO_WRAP evita saltos de línea que pueden corromper la cadena en el paso por el repositorio
-        return Base64.encodeToString(byteArray, Base64.NO_WRAP)
-    }
-
-    private val requestPermissionLauncher = registerForActivityResult(
+    private val requestCameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) {
-            takePictureLauncher.launch()
+        cameraPermissionCallback?.invoke(isGranted)
+        cameraPermissionCallback = null
+        if (isGranted && cameraCallback != null) {
+            takePictureLauncher.launch(null)
         }
+    }
+
+    private val requestLocationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val isGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                        permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        locationPermissionCallback?.invoke(isGranted)
+        locationPermissionCallback = null
+    }
+
+    private fun encodeBitmapToBase64(bitmap: Bitmap): String {
+        val outputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
+        val byteArray = outputStream.toByteArray()
+        return Base64.encodeToString(byteArray, Base64.NO_WRAP)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,16 +63,39 @@ class MainActivity : ComponentActivity() {
         
         initPlatform(this)
 
+        // Configuración del Puente de Cámara
         CameraBridge.onLaunchCamera = { callback ->
             cameraCallback = callback
-            when {
-                ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
-                    takePictureLauncher.launch()
-                }
-                else -> {
-                    requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-                }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                takePictureLauncher.launch(null)
+            } else {
+                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
+        }
+
+        CameraBridge.hasPermission = {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        }
+
+        CameraBridge.onRequestPermission = { callback ->
+            cameraPermissionCallback = callback
+            requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+
+        // Configuración del Puente de Ubicación
+        LocationBridge.hasPermission = {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        }
+
+        LocationBridge.onRequestPermission = { callback ->
+            locationPermissionCallback = callback
+            requestLocationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
 
         setContent {

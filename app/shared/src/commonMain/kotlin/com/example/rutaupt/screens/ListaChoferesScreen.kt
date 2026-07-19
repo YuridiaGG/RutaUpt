@@ -47,7 +47,6 @@ fun ListaChoferesScreen(
                     onClick = {
                         val id = choferAEliminar?.id
                         if (id != null) {
-                            // CORRECCIÓN: Llamada suspend dentro de launch
                             scope.launch {
                                 ChoferRepository.eliminarChofer(id)
                             }
@@ -149,15 +148,54 @@ fun ChoferPerfilCard(
                         fontSize = 18.sp,
                         color = Color.Black
                     )
-                    Text(
-                        text = "Unidad: ${chofer.numeroUnidad}",
-                        fontSize = 14.sp,
-                        color = UPTColors.Vino,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.DirectionsBus, null, modifier = Modifier.size(14.dp), tint = UPTColors.Vino)
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = "Unidad: ${chofer.numeroUnidad}",
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+                    }
                 }
             }
             
+            Spacer(Modifier.height(12.dp))
+            
+            // Sección de Horario Asignado
+            Surface(
+                color = if (chofer.horario == "Sin asignar") Color(0xFFFFEBEE) else Color(0xFFE8F5E9),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccessTime,
+                        contentDescription = null,
+                        tint = if (chofer.horario == "Sin asignar") Color(0xFFD32F2F) else Color(0xFF2E7D32),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "Horario de Ruta", 
+                            fontSize = 10.sp, 
+                            fontWeight = FontWeight.Bold,
+                            color = if (chofer.horario == "Sin asignar") Color(0xFFD32F2F) else Color(0xFF2E7D32)
+                        )
+                        Text(
+                            text = chofer.horario,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    }
+                }
+            }
+
             Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = Color(0xFFF0F0F0))
             Spacer(Modifier.height(12.dp))

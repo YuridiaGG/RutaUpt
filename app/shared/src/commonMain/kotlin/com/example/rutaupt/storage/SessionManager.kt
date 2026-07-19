@@ -11,10 +11,12 @@ object SessionManager {
     var nombreUsuario by mutableStateOf("")
     var apellidosUsuario by mutableStateOf("")
     var emailUsuario by mutableStateOf("")
+    var passwordUsuario by mutableStateOf("")
     var rolUsuario by mutableStateOf("")
     var numeroUnidad by mutableStateOf("")
     var telefonoUsuario by mutableStateOf("")
     var edadUsuario by mutableStateOf("")
+    var horarioUsuario by mutableStateOf("")
     
     // Lógica para 2 reportes al día
     var reportesEnviadosHoy by mutableStateOf(0)
@@ -34,17 +36,21 @@ object SessionManager {
         apellidos: String, 
         email: String, 
         rol: String,
+        password: String? = null,
         unidad: String? = null,
         telefono: String? = null,
-        edad: String? = null
+        edad: String? = null,
+        horario: String? = null
     ) {
         nombreUsuario = nombre.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
         apellidosUsuario = apellidos.split(" ").joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }
         emailUsuario = email
+        passwordUsuario = password ?: ""
         rolUsuario = rol
         numeroUnidad = unidad ?: ""
         telefonoUsuario = telefono ?: ""
         edadUsuario = edad ?: ""
+        horarioUsuario = horario ?: "Sin asignar"
         
         // Verificar si debemos reiniciar el contador diario
         val hoy = obtenerFechaActual()
@@ -74,9 +80,11 @@ object SessionManager {
         nombreUsuario = ""
         apellidosUsuario = ""
         emailUsuario = ""
+        passwordUsuario = ""
         rolUsuario = ""
         numeroUnidad = ""
         telefonoUsuario = ""
         edadUsuario = ""
+        horarioUsuario = ""
     }
 }

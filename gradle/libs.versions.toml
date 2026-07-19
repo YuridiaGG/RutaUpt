@@ -19,6 +19,7 @@ logback = "1.5.32"
 material3 = "1.11.0-alpha07"
 kotlinx-datetime = "0.6.1"
 play-services-maps = "19.0.0"
+play-services-location = "21.3.0"
 exposed = "0.59.0"
 hikaricp = "6.2.1"
 mysql-connector = "9.2.0"
@@ -60,6 +61,7 @@ ktor-server-test-host = { module = "io.ktor:ktor-server-test-host-jvm", version.
 wrappers-browser = { module = "org.jetbrains.kotlin-wrappers:kotlin-browser", version.ref = "kotlin-wrappers" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 play-services-maps = { module = "com.google.android.gms:play-services-maps", version.ref = "play-services-maps" }
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "play-services-location" }
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
 exposed-dao = { module = "org.jetbrains.exposed:exposed-dao", version.ref = "exposed" }
 exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }

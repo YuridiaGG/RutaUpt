@@ -11,15 +11,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.rutaupt.LocationBridge
 import com.example.rutaupt.api.RutaApiService
 import com.example.rutaupt.model.User
 
@@ -33,10 +35,26 @@ fun UbicacionMicrosScreen(
     val apiService = remember { RutaApiService() }
     var choferes by remember { mutableStateOf<List<User>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    
+    var hasLocationPermission by remember { 
+        mutableStateOf(LocationBridge.hasPermission?.invoke() ?: false) 
+    }
 
     LaunchedEffect(Unit) {
         choferes = apiService.obtenerUsuariosPorRol("chofer")
         isLoading = false
+    }
+
+    // Efecto para solicitar permiso si se selecciona una unidad y no lo tiene
+    LaunchedEffect(unidadSeleccionada) {
+        if (unidadSeleccionada != null && !hasLocationPermission) {
+            LocationBridge.onRequestPermission?.invoke { granted ->
+                hasLocationPermission = granted
+                if (!granted) {
+                    unidadSeleccionada = null // Regresar a la lista si rechaza
+                }
+            }
+        }
     }
 
     Scaffold(
@@ -65,10 +83,17 @@ fun UbicacionMicrosScreen(
                     CircularProgressIndicator(color = vinoUpt)
                 }
             } else {
-                ListaUnidadesActivas(padding, choferes) { unidadSeleccionada = it }
+                ListaUnidadesActivas(padding, choferes) { unidad -> 
+                    unidadSeleccionada = unidad 
+                }
             }
-        } else {
+        } else if (hasLocationPermission) {
             MapaTiempoReal(padding, unidadSeleccionada!!)
+        } else {
+            // Mientras pide el permiso o si se está procesando
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = vinoUpt)
+            }
         }
     }
 }
@@ -123,11 +148,10 @@ fun ListaUnidadesActivas(padding: PaddingValues, choferes: List<User>, onSelect:
 @Composable
 fun MapaTiempoReal(padding: PaddingValues, unidad: String) {
     Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-        // Mapa real integrado aquí
         MapComponent(
             modifier = Modifier.fillMaxSize(),
-            latitude = 20.0845, // Ubicación simulada para demo
-            longitude = -98.3695,
+            latitude = -18.006569,
+            longitude = -70.237339,
             title = "Unidad $unidad"
         )
         
@@ -144,7 +168,7 @@ fun MapaTiempoReal(padding: PaddingValues, unidad: String) {
                 }
                 Text("Estado: En movimiento", fontSize = 14.sp, color = Color.Gray)
                 Text("Velocidad: 35 km/h", fontSize = 14.sp, color = Color.Gray)
-                Text("Próxima parada: Parada La Joya", fontSize = 14.sp, color = Color.Gray)
+                Text("Próxima parada: Campus Capanique", fontSize = 14.sp, color = Color.Gray)
             }
         }
     }

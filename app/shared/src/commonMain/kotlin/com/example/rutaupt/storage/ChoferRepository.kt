@@ -5,15 +5,17 @@ import com.example.rutaupt.model.Chofer
 import com.example.rutaupt.model.User
 import com.example.rutaupt.api.RutaApiService
 import com.example.rutaupt.api.AuthApiService
+import com.example.rutaupt.model.ReporteUnidad
+import com.example.rutaupt.model.ReporteTipo
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 object ChoferRepository {
     val choferes = mutableStateListOf<Chofer>()
     private val api = RutaApiService()
     private val authApi = AuthApiService()
 
-    /**
-     * Registra un nuevo chofer en el servidor y lo agrega a la lista local
-     */
     suspend fun registrarChofer(chofer: Chofer): Boolean {
         val user = User(
             nombre = chofer.nombre,
@@ -34,9 +36,6 @@ object ChoferRepository {
         return false
     }
 
-    /**
-     * Elimina el chofer tanto localmente como en la base de datos
-     */
     suspend fun eliminarChofer(id: Int): Boolean {
         val success = api.eliminarUsuario(id)
         if (success) {
@@ -44,16 +43,50 @@ object ChoferRepository {
         }
         return success
     }
+
+    suspend fun actualizarHorario(choferId: Int, nuevoHorario: String): Boolean {
+        val choferActual = choferes.find { it.id == choferId } ?: return false
+        
+        val userUpdate = User(
+            id = choferId,
+            nombre = choferActual.nombre,
+            apellidos = choferActual.apellidos,
+            email = choferActual.email,
+            rol = "chofer",
+            numeroUnidad = choferActual.numeroUnidad,
+            edad = choferActual.edad,
+            telefono = choferActual.telefono,
+            horario = nuevoHorario
+        )
+
+        val success = api.actualizarUsuario(userUpdate)
+        if (success) {
+            // Actualizar localmente
+            val index = choferes.indexOfFirst { it.id == choferId }
+            if (index != -1) {
+                choferes[index] = choferActual.copy(horario = nuevoHorario)
+            }
+            
+            // Notificación para el chofer
+            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            val tiempo = "${now.hour.toString().padStart(2, '0')}:${now.minute.toString().padStart(2, '0')}"
+            
+            ReporteRepository.agregarReporte(
+                ReporteUnidad(
+                    unidad = choferActual.numeroUnidad,
+                    mensaje = "Tu nuevo horario asignado es: $nuevoHorario",
+                    tiempo = tiempo,
+                    tipo = ReporteTipo.INFORMACION,
+                    estado = "HorarioAsignado"
+                )
+            )
+        }
+        return success
+    }
     
-    /**
-     * Carga la lista actualizada desde el servidor (Railway)
-     */
     suspend fun cargarDesdeServidor() {
         try {
-            // Usamos el servicio unificado
             val lista = api.obtenerUsuariosPorRol("chofer")
-            
-            // Actualizamos la lista observable de forma que Compose lo detecte
             choferes.clear()
             lista.forEach { user ->
                 choferes.add(Chofer(
@@ -65,7 +98,7 @@ object ChoferRepository {
                     edad = user.edad ?: "",
                     telefono = user.telefono ?: "",
                     contrasena = "",
-                    horario = "A.M." // Por defecto, se gestionará en la pantalla de horarios
+                    horario = user.horario ?: "Sin asignar"
                 ))
             }
         } catch (e: Exception) {

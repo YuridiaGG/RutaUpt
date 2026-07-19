@@ -40,6 +40,8 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.ktor.client.okhttp)
             implementation(libs.play.services.maps)
+            implementation(libs.play.services.location)
+            implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {
             api(projects.core)

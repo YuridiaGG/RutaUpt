@@ -34,7 +34,8 @@ fun PerfilEstudianteScreen(
     
     var nombre by remember { mutableStateOf(SessionManager.nombreUsuario) }
     var email by remember { mutableStateOf(SessionManager.emailUsuario) }
-    var password by remember { mutableStateOf("123456") }
+    // Ahora obtenemos la contraseña real desde el SessionManager
+    var password by remember { mutableStateOf(SessionManager.passwordUsuario) }
     var passwordVisible by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -127,6 +128,7 @@ fun PerfilEstudianteScreen(
             Button(
                 onClick = {
                     SessionManager.nombreUsuario = nombre
+                    SessionManager.passwordUsuario = password // Guardamos la nueva contraseña si se cambia
                     getPlatform().showNotification("RutaUPT", "¡Perfil actualizado correctamente!")
                     onSaveSuccess()
                 },
