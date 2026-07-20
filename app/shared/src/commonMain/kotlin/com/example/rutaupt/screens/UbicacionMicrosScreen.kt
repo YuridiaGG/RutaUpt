@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -147,28 +148,84 @@ fun ListaUnidadesActivas(padding: PaddingValues, choferes: List<User>, onSelect:
 
 @Composable
 fun MapaTiempoReal(padding: PaddingValues, unidad: String) {
-    Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-        MapComponent(
-            modifier = Modifier.fillMaxSize(),
-            latitude = -18.006569,
-            longitude = -70.237339,
-            title = "Unidad $unidad"
-        )
+    val vinoUpt = UPTColors.Vino
+    
+    // 1. Estado para la ubicación de la micro (empezamos en null para evitar el salto a Perú/Tulancingo)
+    var microLat by remember { mutableStateOf<Double?>(null) }
+    var microLon by remember { mutableStateOf<Double?>(null) }
+
+    // 2. Al abrir el mapa de la micro, obtenemos la ubicación real inmediatamente
+    LaunchedEffect(unidad) {
+        // Pedir ubicación actual para centrar el mapa rápido
+        LocationBridge.getCurrentLocation?.invoke { lat, lon ->
+            microLat = lat
+            microLon = lon
+        }
         
-        Card(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp).fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.9f))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(8.dp).background(Color(0xFF4CAF50), CircleShape))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Unidad $unidad", fontWeight = FontWeight.Bold)
+        // Suscribirse a actualizaciones (por si la micro se mueve)
+        LocationBridge.onLocationUpdate = { lat, lon ->
+            microLat = lat
+            microLon = lon
+        }
+        LocationBridge.startLocationUpdates?.invoke()
+    }
+
+    // Detener el rastreo al salir de la pantalla
+    DisposableEffect(Unit) {
+        onDispose {
+            LocationBridge.stopLocationUpdates?.invoke()
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        if (microLat != null && microLon != null) {
+            // 3. PASAMOS LA UBICACIÓN REAL AL MAPA (Adiós a las coordenadas de Perú/Tulancingo)
+            MapComponent(
+                modifier = Modifier.fillMaxSize(),
+                latitude = microLat!!,
+                longitude = microLon!!,
+                title = "Unidad $unidad"
+            )
+            
+            // Tarjeta informativa flotante
+            Card(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp).fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f)),
+                elevation = CardDefaults.cardElevation(8.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(10.dp).background(Color(0xFF4CAF50), CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Unidad $unidad - En Vivo", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    }
+                    Text("Transmitiendo ubicación exacta", fontSize = 13.sp, color = Color.Gray)
+                    
+                    Button(
+                        onClick = { 
+                            LocationBridge.getCurrentLocation?.invoke { lat, lon ->
+                                microLat = lat
+                                microLon = lon
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
+                    ) {
+                        Icon(Icons.Default.MyLocation, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Actualizar Posición")
+                    }
                 }
-                Text("Estado: En movimiento", fontSize = 14.sp, color = Color.Gray)
-                Text("Velocidad: 35 km/h", fontSize = 14.sp, color = Color.Gray)
-                Text("Próxima parada: Campus Capanique", fontSize = 14.sp, color = Color.Gray)
+            }
+        } else {
+            // 4. Pantalla de carga mientras el GPS te encuentra
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = vinoUpt)
+                    Spacer(Modifier.height(16.dp))
+                    Text("Conectando con el GPS de la unidad...", color = Color.Gray)
+                }
             }
         }
     }

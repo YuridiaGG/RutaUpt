@@ -376,15 +376,45 @@ fun ChoferInicioSection(
 @Composable
 fun ChoferMapaSection(vinoUpt: Color) {
     val hasLocationPermission = LocationBridge.hasPermission?.invoke() ?: false
+    var userLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+
+    LaunchedEffect(hasLocationPermission) {
+        if (hasLocationPermission) {
+            LocationBridge.getCurrentLocation?.invoke { lat, lon ->
+                if (userLocation == null) userLocation = Pair(lat, lon)
+            }
+            LocationBridge.onLocationUpdate = { lat, lon ->
+                userLocation = Pair(lat, lon)
+            }
+            LocationBridge.startLocationUpdates?.invoke()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            LocationBridge.stopLocationUpdates?.invoke()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (hasLocationPermission) {
-            MapComponent(
-                modifier = Modifier.fillMaxSize(),
-                latitude = 20.0820,
-                longitude = -98.3680,
-                title = "Mi Ubicación"
-            )
+            val location = userLocation
+            if (location != null) {
+                MapComponent(
+                    modifier = Modifier.fillMaxSize(),
+                    latitude = location.first,
+                    longitude = location.second,
+                    title = "Mi Ubicación"
+                )
+            } else {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = vinoUpt)
+                        Spacer(Modifier.height(16.dp))
+                        Text("Obteniendo tu ubicación...", color = Color.Gray)
+                    }
+                }
+            }
         } else {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -408,7 +438,7 @@ fun ChoferMapaSection(vinoUpt: Color) {
                 Row(modifier = Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.MyLocation, null, tint = Color(0xFF2196F3))
                     Spacer(Modifier.width(12.dp))
-                    Text(if (hasLocationPermission) "GPS en tiempo real activo..." else "Esperando permisos...", color = Color.Gray, fontWeight = FontWeight.Medium)
+                    Text(if (userLocation != null) "GPS en tiempo real activo" else "Buscando señal GPS...", color = Color.Gray, fontWeight = FontWeight.Medium)
                 }
             }
         }

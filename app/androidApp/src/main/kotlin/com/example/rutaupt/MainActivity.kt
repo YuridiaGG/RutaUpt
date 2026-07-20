@@ -16,13 +16,18 @@ import com.example.rutaupt.App
 import java.io.ByteArrayOutputStream
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
 import android.location.Location
+import android.os.Looper
 
 class MainActivity : ComponentActivity() {
     
     private var cameraCallback: ((String) -> Unit)? = null
     private var locationPermissionCallback: ((Boolean) -> Unit)? = null
     private var cameraPermissionCallback: ((Boolean) -> Unit)? = null
+    private lateinit var locationCallback: LocationCallback
 
     private val takePictureLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
@@ -99,28 +104,51 @@ class MainActivity : ComponentActivity() {
             )
         }
         
-        // Implementación para obtener la ubicación actual usando Google Play Services
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        
+        // 1. Obtener ubicación una sola vez
         LocationBridge.getCurrentLocation = { callback ->
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
 
                 fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
                     .addOnSuccessListener { location: Location? ->
-                        if (location != null) {
-                            callback(location.latitude, location.longitude)
-                        } else {
-                            fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc: Location? ->
-                                if (lastLoc != null) callback(lastLoc.latitude, lastLoc.longitude)
-                            }
-                        }
+                        location?.let { callback(it.latitude, it.longitude) }
                     }
             }
+        }
+
+        // 2. Rastreo en TIEMPO REAL (Como WhatsApp)
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000)
+            .setMinUpdateIntervalMillis(500)
+            .build()
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                locationResult.lastLocation?.let {
+                    LocationBridge.onLocationUpdate?.invoke(it.latitude, it.longitude)
+                }
+            }
+        }
+
+        LocationBridge.startLocationUpdates = {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+            }
+        }
+
+        LocationBridge.stopLocationUpdates = {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
         }
 
         setContent {
             App()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        LocationBridge.stopLocationUpdates?.invoke()
     }
 }
 

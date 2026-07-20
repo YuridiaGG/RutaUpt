@@ -218,8 +218,27 @@ fun HomeEstudianteScreen(
 fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onNavigateToRuta: () -> Unit, onSendReport: (String) -> Unit) {
     val trackingService = remember { TrackingService() }
     
-    val userLat = 20.0820
-    val userLon = -98.3680
+    // 1. ESTADO PARA TU UBICACIÓN REAL
+    var currentUserLat by remember { mutableStateOf<Double?>(null) }
+    var currentUserLon by remember { mutableStateOf<Double?>(null) }
+
+    // 2. ACTIVAR RASTREO GPS EN TIEMPO REAL
+    DisposableEffect(hasPermission) {
+        if (hasPermission) {
+            LocationBridge.getCurrentLocation?.invoke { lat, lon ->
+                currentUserLat = lat
+                currentUserLon = lon
+            }
+            LocationBridge.onLocationUpdate = { lat, lon ->
+                currentUserLat = lat
+                currentUserLon = lon
+            }
+            LocationBridge.startLocationUpdates?.invoke()
+        }
+        onDispose {
+            LocationBridge.stopLocationUpdates?.invoke()
+        }
+    }
 
     val unidadesMock = remember {
         mutableStateListOf(
@@ -233,7 +252,10 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
     var unidadMasCercana by remember { mutableStateOf(unidadesMock[0]) }
     var tiempoEstimado by remember { mutableStateOf(5) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(currentUserLat, currentUserLon) {
+        val lat = currentUserLat ?: 20.0820
+        val lon = currentUserLon ?: -98.3680
+        
         while(true) {
             for (i in unidadesMock.indices) {
                 val u = unidadesMock[i]
@@ -243,12 +265,12 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
                 )
             }
             
-            unidadMasCercana = unidadesMock.minBy { (_, lat, lon) ->
-                abs(lat - userLat) + abs(lon - userLon)
+            unidadMasCercana = unidadesMock.minBy { (_, bLat, bLon) ->
+                abs(bLat - lat) + abs(bLon - lon)
             }
             
             tiempoEstimado = trackingService.calcularTiempoEstimado(
-                userLat, userLon, unidadMasCercana.second, unidadMasCercana.third
+                lat, lon, unidadMasCercana.second, unidadMasCercana.third
             )
             delay(5000)
         }
@@ -346,12 +368,12 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
                 elevation = CardDefaults.cardElevation(4.dp)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    if (hasPermission) {
+                    if (hasPermission && currentUserLat != null) {
                         MapComponent(
                             modifier = Modifier.fillMaxSize(),
-                            latitude = unidadMasCercana.second,
-                            longitude = unidadMasCercana.third,
-                            title = "Unidad ${unidadMasCercana.first}"
+                            latitude = currentUserLat!!,
+                            longitude = currentUserLon!!,
+                            title = "Mi Ubicación Exacta"
                         )
                         
                         Surface(
@@ -363,14 +385,22 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(modifier = Modifier.size(8.dp).background(Color(0xFF4CAF50), CircleShape))
+                                Box(modifier = Modifier.size(8.dp).background(Color(0xFF2196F3), CircleShape))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Micro ${unidadMasCercana.first} en vivo", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text("Tu ubicación actual", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                             }
                         }
-                    } else {
+                    } else if (!hasPermission) {
                         Box(modifier = Modifier.fillMaxSize().background(Color.LightGray), contentAlignment = Alignment.Center) {
                             Text("Se requiere permiso de ubicación", color = Color.DarkGray)
+                        }
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = vinoUpt)
+                                Spacer(Modifier.height(16.dp))
+                                Text("Obteniendo ubicación exacta...", color = Color.Gray)
+                            }
                         }
                     }
                 }
