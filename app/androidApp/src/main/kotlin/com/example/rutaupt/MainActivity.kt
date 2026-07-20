@@ -14,6 +14,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
 import com.example.rutaupt.App
 import java.io.ByteArrayOutputStream
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import android.location.Location
 
 class MainActivity : ComponentActivity() {
     
@@ -63,7 +66,6 @@ class MainActivity : ComponentActivity() {
         
         initPlatform(this)
 
-        // Configuración del Puente de Cámara
         CameraBridge.onLaunchCamera = { callback ->
             cameraCallback = callback
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -82,7 +84,6 @@ class MainActivity : ComponentActivity() {
             requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
 
-        // Configuración del Puente de Ubicación
         LocationBridge.hasPermission = {
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -96,6 +97,25 @@ class MainActivity : ComponentActivity() {
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 )
             )
+        }
+        
+        // Implementación para obtener la ubicación actual usando Google Play Services
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        LocationBridge.getCurrentLocation = { callback ->
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+
+                fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                    .addOnSuccessListener { location: Location? ->
+                        if (location != null) {
+                            callback(location.latitude, location.longitude)
+                        } else {
+                            fusedLocationClient.lastLocation.addOnSuccessListener { lastLoc: Location? ->
+                                if (lastLoc != null) callback(lastLoc.latitude, lastLoc.longitude)
+                            }
+                        }
+                    }
+            }
         }
 
         setContent {

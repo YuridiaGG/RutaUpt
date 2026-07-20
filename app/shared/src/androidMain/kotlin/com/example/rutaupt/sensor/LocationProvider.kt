@@ -2,41 +2,46 @@ package com.example.rutaupt.sensor
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import com.example.rutaupt.model.Ubicacion
 import com.example.rutaupt.repository.SensorRepository
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
-class LocationProvider(context: Context) : SensorRepository {
-    private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+class LocationProvider(private val context: Context) : SensorRepository {
+    private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
     @SuppressLint("MissingPermission")
     override fun getUbicacionActual(): Flow<Ubicacion> = callbackFlow {
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000).build()
-        
-        val locationCallback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let {
-                    trySend(Ubicacion(it.latitude, it.longitude, it.time))
-                }
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                trySend(Ubicacion(location.latitude, location.longitude, location.time))
             }
         }
 
-        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
-        awaitClose { fusedLocationClient.removeLocationUpdates(locationCallback) }
+        // Usamos el proveedor GPS que no depende de los servicios de Google
+        try {
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                5000L,
+                10f,
+                listener
+            )
+            
+            // Enviamos la última ubicación conocida para que el mapa no inicie vacío
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let {
+                trySend(Ubicacion(it.latitude, it.longitude, it.time))
+            }
+        } catch (e: Exception) {
+            // Manejar error si el proveedor no está disponible
+        }
+
+        awaitClose { locationManager.removeUpdates(listener) }
     }
 
-    override fun iniciarSeguimiento() {
-        // Implementación de inicio
-    }
-
-    override fun detenerSeguimiento() {
-        // Implementación de detención
-    }
+    override fun iniciarSeguimiento() {}
+    override fun detenerSeguimiento() {}
 }

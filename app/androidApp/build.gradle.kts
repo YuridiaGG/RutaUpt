@@ -15,6 +15,10 @@ dependencies {
     implementation(projects.app.shared)
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.preference)
+    implementation(libs.osmdroid)
+    implementation(libs.play.services.location)
+
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)

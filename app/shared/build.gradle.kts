@@ -39,8 +39,9 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.ktor.client.okhttp)
-            implementation(libs.play.services.maps)
             implementation(libs.play.services.location)
+            implementation(libs.play.services.maps)
+            implementation(libs.maps.compose)
             implementation(libs.androidx.activity.compose)
         }
         commonMain.dependencies {

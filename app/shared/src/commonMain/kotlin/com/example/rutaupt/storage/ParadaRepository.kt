@@ -1,44 +1,55 @@
 package com.example.rutaupt.storage
 
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.example.rutaupt.api.RutaApiService
 
 object ParadaRepository {
-    // Exponemos el SnapshotStateList directamente para asegurar reactividad en Compose
     val paradas = mutableStateListOf<String>()
-    
     private val apiService = RutaApiService()
 
     suspend fun cargarParadas() {
         try {
             val remoteParadas = apiService.obtenerParadas()
-            paradas.clear()
-            paradas.addAll(remoteParadas)
+            if (remoteParadas.isNotEmpty()) {
+                paradas.clear()
+                paradas.addAll(remoteParadas)
+            }
         } catch (e: Exception) {
-            // Manejar error si es necesario
+            // Silencioso para no interrumpir la UI
         }
     }
 
     suspend fun agregarParada(nombre: String): Boolean {
         if (nombre.isNotBlank() && !paradas.contains(nombre)) {
-            val success = apiService.agregarParada(nombre)
-            if (success) {
-                // Si el backend responde éxito, lo añadimos localmente
-                paradas.add(nombre)
-                return true
+            // Añadimos localmente primero (UI Optimista)
+            paradas.add(nombre)
+            
+            // Intentamos guardar en el servidor
+            return try {
+                val success = apiService.agregarParada(nombre)
+                if (!success) {
+                    // Si falla el servidor, podrías elegir removerla o dejarla local
+                    // paradas.remove(nombre) 
+                }
+                success
+            } catch (e: Exception) {
+                false
             }
         }
         return false
     }
 
     suspend fun eliminarParada(nombre: String): Boolean {
-        val success = apiService.eliminarParada(nombre)
-        if (success) {
-            paradas.remove(nombre)
-            return true
+        return try {
+            val success = apiService.eliminarParada(nombre)
+            if (success) {
+                paradas.remove(nombre)
+            }
+            success
+        } catch (e: Exception) {
+            paradas.remove(nombre) // Eliminamos local aunque falle el server para fluidez
+            true
         }
-        return false
     }
     
     fun limpiarParadas() {
