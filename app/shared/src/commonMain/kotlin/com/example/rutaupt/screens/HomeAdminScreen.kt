@@ -35,6 +35,8 @@ import com.example.rutaupt.model.ReporteUnidad
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
 import com.example.rutaupt.storage.ParadaRepository
+import com.example.rutaupt.storage.ChoferRepository
+import com.example.rutaupt.storage.EstudianteRepository
 import com.example.rutaupt.api.RutaApiService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -77,11 +79,15 @@ fun HomeAdminScreen(
                 hasLocationPermission = granted
             }
         }
-        stats = apiService.obtenerEstadisticasAdmin()
-        ParadaRepository.cargarParadas()
         
-        // Polling para actualizaciones en tiempo real (cada 10 segundos)
+        // Cargar datos reales de los repositorios
+        scope.launch { ChoferRepository.cargarDesdeServidor() }
+        scope.launch { EstudianteRepository.cargarDesdeServidor() }
+        scope.launch { ParadaRepository.cargarParadas() }
+        
+        // Polling para estadísticas y reportes
         while(true) {
+            stats = apiService.obtenerEstadisticasAdmin()
             ReporteRepository.cargarReportes()
             delay(10000)
         }
@@ -276,8 +282,11 @@ fun HomeAdminScreen(
                 Spacer(Modifier.height(16.dp))
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    StatCard("${stats["estudiantes"]}", "Estudiantes registrados", Icons.Default.Group, Modifier.weight(1f))
-                    StatCard("${stats["choferes"]}", "Choferes registrados", Icons.Default.Badge, Modifier.weight(1f))
+                    val numEstudiantes = EstudianteRepository.estudiantes.size.takeIf { it > 0 } ?: stats["estudiantes"] ?: 0
+                    StatCard("$numEstudiantes", "Estudiantes registrados", Icons.Default.Group, Modifier.weight(1f))
+                    
+                    val numChoferes = ChoferRepository.choferes.size.takeIf { it > 0 } ?: stats["choferes"] ?: 0
+                    StatCard("$numChoferes", "Choferes registrados", Icons.Default.Badge, Modifier.weight(1f))
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {

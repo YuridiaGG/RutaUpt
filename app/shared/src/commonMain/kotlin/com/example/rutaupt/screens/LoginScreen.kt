@@ -1,5 +1,6 @@
 package com.example.rutaupt.screens
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -195,9 +196,21 @@ fun LoginScreen(
                                         unidad = user.numeroUnidad,
                                         telefono = user.telefono,
                                         edad = user.edad,
-                                        horario = user.horario // Capturamos el horario de la BD
+                                        horario = user.horario 
                                     )
-                                    getPlatform().showNotification("RutaUPT", "¡Hola ${user.nombre}!")
+                                    
+                                    val rolTraducido = when(user.rol.lowercase()) {
+                                        "admin" -> "Administrador"
+                                        "chofer" -> "Chofer"
+                                        "estudiante" -> "Estudiante"
+                                        else -> user.rol
+                                    }
+                                    
+                                    getPlatform().showNotification(
+                                        "¡Bienvenido a RutaUPT!", 
+                                        "$rolTraducido: ${user.nombre} ${user.apellidos}"
+                                    )
+
                                     onLoginSuccess(user.rol.lowercase())
                                 } ?: run {
                                     snackbarHostState.showSnackbar("Error: Datos de usuario incompletos.")

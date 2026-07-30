@@ -2,41 +2,50 @@ package com.example.rutaupt.sensor
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
+import android.os.Looper
 import com.example.rutaupt.model.Ubicacion
 import com.example.rutaupt.repository.SensorRepository
+import com.google.android.gms.location.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 
 class LocationProvider(private val context: Context) : SensorRepository {
-    private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+    private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
 
     @SuppressLint("MissingPermission")
     override fun getUbicacionActual(): Flow<Ubicacion> = callbackFlow {
-        val listener = object : LocationListener {
-            override fun onLocationChanged(location: Location) {
-                trySend(Ubicacion(location.latitude, location.longitude, location.time))
-            }
-        }
-
-        try {
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                5000L,
-                10f,
-                listener
-            )
-            
-            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let {
+        // 1. Intentar obtener la última ubicación conocida inmediatamente para rapidez
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            location?.let {
                 trySend(Ubicacion(it.latitude, it.longitude, it.time))
             }
-        } catch (e: Exception) {
         }
 
-        awaitClose { locationManager.removeUpdates(listener) }
+        // 2. Configuración de alta precisión (Ubicación Exacta)
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000L)
+            .setMinUpdateIntervalMillis(1000L) // Actualizaciones muy frecuentes
+            .setWaitForAccurateLocation(true) // Esperar a que el GPS sea preciso
+            .build()
+
+        val callback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                result.lastLocation?.let {
+                    trySend(Ubicacion(it.latitude, it.longitude, it.time))
+                }
+            }
+        }
+
+        // Iniciar peticiones de actualización
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            callback,
+            Looper.getMainLooper()
+        )
+
+        awaitClose {
+            fusedLocationClient.removeLocationUpdates(callback)
+        }
     }
 
     override fun iniciarSeguimiento() {}
