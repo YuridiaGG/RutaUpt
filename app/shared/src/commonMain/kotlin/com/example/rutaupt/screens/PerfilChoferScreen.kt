@@ -150,7 +150,7 @@ fun PerfilChoferScreen(
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Email, null) },
                 shape = RoundedCornerShape(12.dp),
-                enabled = false
+                enabled = !isLoading // Habilitado ahora
             )
 
             OutlinedTextField(
@@ -194,6 +194,7 @@ fun PerfilChoferScreen(
                         if (success) {
                             SessionManager.nombreUsuario = nombre
                             SessionManager.apellidosUsuario = apellidos
+                            SessionManager.emailUsuario = email // Actualizar email en sesión
                             SessionManager.edadUsuario = edad
                             SessionManager.telefonoUsuario = telefono
                             SessionManager.numeroUnidad = numeroUnidad

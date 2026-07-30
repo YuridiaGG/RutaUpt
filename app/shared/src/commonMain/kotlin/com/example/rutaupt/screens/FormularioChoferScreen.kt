@@ -37,9 +37,10 @@ fun FormularioChoferScreen(
     var telefono by remember { mutableStateOf(choferElegido?.telefono ?: "") }
     var numeroUnidad by remember { mutableStateOf(choferElegido?.numeroUnidad ?: "") }
     var email by remember { mutableStateOf(choferElegido?.email ?: "") }
-    var password by remember { mutableStateOf(choferElegido?.contrasena ?: "") }
-    var confirmPassword by remember { mutableStateOf(choferElegido?.contrasena ?: "") }
+    var password by remember { mutableStateOf("") } // Password empty by default for edit
+    var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var isLoading by remember { mutableStateOf(false) }
 
     val vinoUpt = UPTColors.Vino
 
@@ -53,7 +54,7 @@ fun FormularioChoferScreen(
             TopAppBar(
                 title = { Text(if (choferElegido == null) "Agregar Chofer" else "Editar Chofer", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onVolver) {
+                    IconButton(onClick = onVolver, enabled = !isLoading) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Regresar")
                     }
                 },
@@ -79,14 +80,16 @@ fun FormularioChoferScreen(
                 onValueChange = { nombre = it },
                 label = { Text("Nombre(s)") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
             OutlinedTextField(
                 value = apellidos,
                 onValueChange = { apellidos = it },
                 label = { Text("Apellidos") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -96,14 +99,16 @@ fun FormularioChoferScreen(
                     label = { Text("Edad") },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    enabled = !isLoading
                 )
                 OutlinedTextField(
                     value = numeroUnidad,
                     onValueChange = { numeroUnidad = it },
                     label = { Text("N° Unidad") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isLoading
                 )
             }
 
@@ -114,7 +119,8 @@ fun FormularioChoferScreen(
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Phone, null) },
                 shape = RoundedCornerShape(12.dp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                enabled = !isLoading
             )
 
             OutlinedTextField(
@@ -124,13 +130,14 @@ fun FormularioChoferScreen(
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Email, null) },
                 shape = RoundedCornerShape(12.dp),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                enabled = !isLoading
             )
 
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Contraseña (mín. 8 caracteres)") },
+                label = { Text(if(choferElegido == null) "Contraseña (mín. 8 caracteres)" else "Nueva Contraseña (opcional)") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
@@ -142,24 +149,28 @@ fun FormularioChoferScreen(
                     }
                 },
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoading
             )
 
-            OutlinedTextField(
-                value = confirmPassword,
-                onValueChange = { confirmPassword = it },
-                label = { Text("Confirmar Contraseña") },
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = { Icon(Icons.Default.Lock, null) },
-                visualTransformation = PasswordVisualTransformation(),
-                shape = RoundedCornerShape(12.dp)
-            )
+            if (password.isNotBlank()) {
+                OutlinedTextField(
+                    value = confirmPassword,
+                    onValueChange = { confirmPassword = it },
+                    label = { Text("Confirmar Contraseña") },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = { Icon(Icons.Default.Lock, null) },
+                    visualTransformation = PasswordVisualTransformation(),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isLoading
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
-                    if (nombre.isBlank() || email.isBlank() || password.isBlank() || telefono.isBlank() || numeroUnidad.isBlank()) {
+                    if (nombre.isBlank() || email.isBlank() || (choferElegido == null && password.isBlank()) || telefono.isBlank() || numeroUnidad.isBlank()) {
                         scope.launch { snackbarHostState.showSnackbar("Complete todos los campos obligatorios") }
                         return@Button
                     }
@@ -171,15 +182,18 @@ fun FormularioChoferScreen(
                         scope.launch { snackbarHostState.showSnackbar("El teléfono debe tener 10 dígitos") }
                         return@Button
                     }
-                    if (password.length < 8) {
-                        scope.launch { snackbarHostState.showSnackbar("La contraseña debe tener al menos 8 caracteres") }
-                        return@Button
-                    }
-                    if (password != confirmPassword) {
-                        scope.launch { snackbarHostState.showSnackbar("Las contraseñas no coinciden") }
-                        return@Button
+                    if (password.isNotBlank()) {
+                        if (password.length < 8) {
+                            scope.launch { snackbarHostState.showSnackbar("La contraseña debe tener al menos 8 caracteres") }
+                            return@Button
+                        }
+                        if (password != confirmPassword) {
+                            scope.launch { snackbarHostState.showSnackbar("Las contraseñas no coinciden") }
+                            return@Button
+                        }
                     }
 
+                    isLoading = true
                     scope.launch {
                         val chofer = Chofer(
                             id = choferElegido?.id ?: 0,
@@ -195,10 +209,10 @@ fun FormularioChoferScreen(
                         val exito = if (choferElegido == null) {
                             ChoferRepository.registrarChofer(chofer)
                         } else {
-                            // En el futuro implementar ChoferRepository.actualizarChofer(chofer)
-                            true 
+                            ChoferRepository.actualizarChofer(chofer)
                         }
                         
+                        isLoading = false
                         if (exito) {
                             onVolver()
                         } else {
@@ -208,9 +222,14 @@ fun FormularioChoferScreen(
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(28.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
+                colors = ButtonDefaults.buttonColors(containerColor = vinoUpt),
+                enabled = !isLoading
             ) {
-                Text(if (choferElegido == null) "Guardar Chofer" else "Actualizar Datos", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                if (isLoading) {
+                    CircularProgressIndicator(color = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text(if (choferElegido == null) "Guardar Chofer" else "Actualizar Datos", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

@@ -36,6 +36,27 @@ object ChoferRepository {
         return false
     }
 
+    suspend fun actualizarChofer(chofer: Chofer): Boolean {
+        val userUpdate = User(
+            id = chofer.id,
+            nombre = chofer.nombre,
+            apellidos = chofer.apellidos,
+            email = chofer.email,
+            password = if (chofer.contrasena.isNotBlank()) chofer.contrasena else null,
+            rol = "chofer",
+            numeroUnidad = chofer.numeroUnidad,
+            edad = chofer.edad,
+            telefono = chofer.telefono,
+            horario = chofer.horario
+        )
+
+        val success = api.actualizarUsuario(userUpdate)
+        if (success) {
+            cargarDesdeServidor()
+        }
+        return success
+    }
+
     suspend fun eliminarChofer(id: Int): Boolean {
         val success = api.eliminarUsuario(id)
         if (success) {

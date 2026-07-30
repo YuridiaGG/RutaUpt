@@ -288,7 +288,7 @@ fun ChoferInicioSection(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            "Unidad X (${SessionManager.numeroUnidad.ifBlank { "S/N" }})", 
+                            "Unidad ${SessionManager.numeroUnidad.ifBlank { "S/N" }}", 
                             color = Color.White, 
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), 
                             fontSize = 13.sp, 
@@ -360,7 +360,7 @@ fun ChoferInicioSection(
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             Text(
                 text = "Paradas de la ruta",
