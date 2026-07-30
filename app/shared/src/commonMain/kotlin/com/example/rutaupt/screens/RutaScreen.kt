@@ -6,6 +6,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsBus
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
@@ -19,6 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rutaupt.LocationBridge
+import com.example.rutaupt.storage.ParadaRepository
+import com.example.rutaupt.api.Parada
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +31,7 @@ fun RutaScreen(onVolver: () -> Unit) {
     // Estado para la ubicación real del usuario
     var userLat by remember { mutableStateOf<Double?>(null) }
     var userLon by remember { mutableStateOf<Double?>(null) }
+    var selectedParada by remember { mutableStateOf<Parada?>(null) }
     
     val hasPermission = LocationBridge.hasPermission?.invoke() ?: false
 
@@ -47,6 +51,7 @@ fun RutaScreen(onVolver: () -> Unit) {
             }
             LocationBridge.startLocationUpdates?.invoke()
         }
+        ParadaRepository.cargarParadas()
     }
 
     DisposableEffect(Unit) {
@@ -78,12 +83,14 @@ fun RutaScreen(onVolver: () -> Unit) {
                 .padding(padding)
         ) {
             if (userLat != null && userLon != null) {
-                // --- MAPA CON UBICACIÓN REAL ---
+                // --- MAPA CON UBICACIÓN REAL Y PARADAS ---
                 MapComponent(
                     modifier = Modifier.fillMaxSize(),
                     latitude = userLat!!,
                     longitude = userLon!!,
-                    title = "Mi Ubicación Exacta"
+                    title = "Mi Ubicación Exacta",
+                    paradas = ParadaRepository.paradas,
+                    onParadaSelected = { selectedParada = it }
                 )
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -114,7 +121,7 @@ fun RutaScreen(onVolver: () -> Unit) {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(bottom = 120.dp, end = 16.dp),
+                    .padding(bottom = if (selectedParada != null) 200.dp else 120.dp, end = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 FloatingActionButton(
@@ -133,39 +140,65 @@ fun RutaScreen(onVolver: () -> Unit) {
                 }
             }
 
-            // --- TARJETA DE DETALLES ---
-            Card(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .shadow(16.dp, RoundedCornerShape(20.dp)),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // --- TARJETA DE DETALLES (Dinámica si hay parada seleccionada) ---
+            if (selectedParada != null) {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .shadow(16.dp, RoundedCornerShape(20.dp)),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f))
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .background(vinoUpt.copy(alpha = 0.1f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = vinoUpt)
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(50.dp)
+                                    .background(vinoUpt.copy(alpha = 0.1f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = vinoUpt)
+                            }
+                            Spacer(Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(selectedParada!!.nombre, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Text("Parada de la ruta", color = Color.Gray, fontSize = 14.sp)
+                            }
+                            IconButton(onClick = { selectedParada = null }) {
+                                Icon(Icons.Default.Close, contentDescription = "Cerrar")
+                            }
+                        }
                     }
-                    Spacer(Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Unidad UPT-05", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("En recorrido - Ubicación real", color = Color.Gray, fontSize = 14.sp)
-                    }
-                    Button(
-                        onClick = { },
-                        colors = ButtonDefaults.buttonColors(containerColor = vinoUpt),
-                        shape = RoundedCornerShape(12.dp)
+                }
+            } else {
+                Card(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .shadow(16.dp, RoundedCornerShape(20.dp)),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(20.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Detalles")
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .background(vinoUpt.copy(alpha = 0.1f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = vinoUpt)
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Unidad UPT-05", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("En recorrido - Ubicación real", color = Color.Gray, fontSize = 14.sp)
+                        }
                     }
                 }
             }
