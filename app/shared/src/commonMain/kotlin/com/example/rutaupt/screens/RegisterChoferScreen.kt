@@ -3,6 +3,7 @@ package com.example.rutaupt.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -44,6 +46,11 @@ fun RegisterChoferScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val authService = remember { AuthApiService() }
+
+    fun isEmailValid(email: String): Boolean {
+        val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$"
+        return email.matches(Regex(emailRegex))
+    }
 
     Scaffold(
         topBar = {
@@ -95,11 +102,12 @@ fun RegisterChoferScreen(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = edad,
-                    onValueChange = { if(it.length <= 3) edad = it },
+                    onValueChange = { if(it.length <= 3 && it.all { char -> char.isDigit() }) edad = it },
                     label = { Text("Edad") },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    enabled = !isLoading
+                    enabled = !isLoading,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
                     value = numeroUnidad,
@@ -113,12 +121,13 @@ fun RegisterChoferScreen(
 
             OutlinedTextField(
                 value = telefono,
-                onValueChange = { telefono = it },
-                label = { Text("Número de Teléfono") },
+                onValueChange = { if(it.length <= 10 && it.all { char -> char.isDigit() }) telefono = it },
+                label = { Text("Número de Teléfono (10 dígitos)") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Phone, null) },
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading
+                enabled = !isLoading,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
             )
 
             OutlinedTextField(
@@ -128,13 +137,14 @@ fun RegisterChoferScreen(
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Email, null) },
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading
+                enabled = !isLoading,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Contraseña") },
+                label = { Text("Contraseña (mín. 8 caracteres)") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
@@ -165,8 +175,20 @@ fun RegisterChoferScreen(
 
             Button(
                 onClick = {
-                    if (nombre.isBlank() || email.isBlank() || password.isBlank() || numeroUnidad.isBlank()) {
+                    if (nombre.isBlank() || email.isBlank() || password.isBlank() || numeroUnidad.isBlank() || telefono.isBlank()) {
                         scope.launch { snackbarHostState.showSnackbar("Complete todos los campos obligatorios") }
+                        return@Button
+                    }
+                    if (!isEmailValid(email.trim())) {
+                        scope.launch { snackbarHostState.showSnackbar("Ingrese un correo electrónico válido") }
+                        return@Button
+                    }
+                    if (telefono.length != 10) {
+                        scope.launch { snackbarHostState.showSnackbar("El teléfono debe tener 10 dígitos") }
+                        return@Button
+                    }
+                    if (password.length < 8) {
+                        scope.launch { snackbarHostState.showSnackbar("La contraseña debe tener al menos 8 caracteres") }
                         return@Button
                     }
                     if (password != confirmPassword) {
@@ -193,7 +215,7 @@ fun RegisterChoferScreen(
                                 nombre = nombre,
                                 apellidos = apellidos,
                                 email = email,
-                                password = password, // Guardamos la contraseña en sesión
+                                password = password,
                                 rol = "chofer",
                                 unidad = numeroUnidad,
                                 telefono = telefono,

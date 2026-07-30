@@ -3,6 +3,7 @@ package com.example.rutaupt
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.ImageBitmap
 import web.navigator.navigator
+import web.window.window
 
 class JsPlatform: Platform {
     private val userAgent = navigator.userAgent
@@ -18,6 +19,10 @@ class JsPlatform: Platform {
 
     override fun openCamera(onSuccess: (String) -> Unit) {
         // Implementación básica para web
+    }
+
+    override fun openUrl(url: String) {
+        window.open(url, "_blank")
     }
 }
 

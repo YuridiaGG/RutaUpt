@@ -7,6 +7,7 @@ interface Platform {
     val name: String
     fun showNotification(title: String, message: String)
     fun openCamera(onSuccess: (String) -> Unit)
+    fun openUrl(url: String)
 }
 
 expect fun getPlatform(): Platform

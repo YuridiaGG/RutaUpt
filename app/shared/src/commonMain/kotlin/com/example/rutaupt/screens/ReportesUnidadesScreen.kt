@@ -29,6 +29,7 @@ import com.example.rutaupt.model.ReporteUnidad
 import com.example.rutaupt.model.ReporteTipo
 import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.rememberBitmapFromBase64
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +37,7 @@ fun ReportesUnidadesScreen(
     onVolver: () -> Unit
 ) {
     val vinoUpt = UPTColors.Vino
+    val scope = rememberCoroutineScope()
     var imagenSeleccionada by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
@@ -73,8 +75,16 @@ fun ReportesUnidadesScreen(
                 items(listaReportes, key = { it.id }) { reporte ->
                     ReporteCard(
                         reporte = reporte,
-                        onValidar = { ReporteRepository.actualizarValidacion(reporte.id, "VALIDADO") },
-                        onRechazar = { ReporteRepository.actualizarValidacion(reporte.id, "RECHAZADO") },
+                        onValidar = { 
+                            scope.launch {
+                                ReporteRepository.actualizarValidacion(reporte.id, "VALIDADO") 
+                            }
+                        },
+                        onRechazar = { 
+                            scope.launch {
+                                ReporteRepository.actualizarValidacion(reporte.id, "RECHAZADO") 
+                            }
+                        },
                         onVerImagen = { imagenSeleccionada = it }
                     )
                 }

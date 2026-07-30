@@ -17,8 +17,6 @@ actual fun MapComponent(
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(destination, 15f)
     }
-
-    // Efecto para centrar el mapa cuando cambian las coordenadas de destino
     LaunchedEffect(latitude, longitude) {
         cameraPositionState.position = CameraPosition.fromLatLngZoom(destination, 15f)
     }

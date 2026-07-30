@@ -22,7 +22,6 @@ class LocationProvider(private val context: Context) : SensorRepository {
             }
         }
 
-        // Usamos el proveedor GPS que no depende de los servicios de Google
         try {
             locationManager.requestLocationUpdates(
                 LocationManager.GPS_PROVIDER,
@@ -31,12 +30,10 @@ class LocationProvider(private val context: Context) : SensorRepository {
                 listener
             )
             
-            // Enviamos la última ubicación conocida para que el mapa no inicie vacío
             locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let {
                 trySend(Ubicacion(it.latitude, it.longitude, it.time))
             }
         } catch (e: Exception) {
-            // Manejar error si el proveedor no está disponible
         }
 
         awaitClose { locationManager.removeUpdates(listener) }

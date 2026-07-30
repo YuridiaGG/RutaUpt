@@ -29,6 +29,7 @@ import com.example.rutaupt.LocationBridge
 import com.example.rutaupt.CameraBridge
 import com.example.rutaupt.model.ReporteUnidad
 import com.example.rutaupt.model.ReporteTipo
+import com.example.rutaupt.api.Parada
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
 import com.example.rutaupt.storage.ParadaRepository
@@ -54,6 +55,7 @@ fun HomeChoferScreen(
     val vinoUpt = UPTColors.Vino
     val vinoOscuro = UPTColors.VinoOscuro
     val fondoGris = Color(0xFFF8F9FA)
+    val scope = rememberCoroutineScope()
     
     var selectedTab by remember { mutableStateOf("Inicio") }
     val historial = remember { mutableStateListOf<ChoferHistorialAccion>() }
@@ -67,6 +69,7 @@ fun HomeChoferScreen(
             CameraBridge.onRequestPermission?.invoke { _ -> }
         }
         ParadaRepository.cargarParadas()
+        ReporteRepository.cargarReportes() // Cargamos reportes reales de la BD
     }
 
     fun registrarEstado(estado: String, icono: ImageVector, color: Color, imagen: String? = null) {
@@ -77,25 +80,26 @@ fun HomeChoferScreen(
         val unidad = SessionManager.numeroUnidad.ifBlank { "Sin asignar" }
         val mensaje = if (imagen != null) "Unidad $unidad reporta retraso con evidencia" else "Unidad $unidad: $estado"
         
-        ReporteRepository.agregarReporte(
-            ReporteUnidad(
-                unidad = unidad, 
-                mensaje = mensaje, 
-                tiempo = fechaStr, 
-                tipo = if (imagen != null) ReporteTipo.ALERTA else ReporteTipo.INFORMACION,
-                imagen = imagen,
-                estado = "EstadoChofer_$estado" // Marcador para que el chofer no vea sus propios estados
+        scope.launch {
+            ReporteRepository.agregarReporte(
+                ReporteUnidad(
+                    unidad = unidad, 
+                    mensaje = mensaje, 
+                    tiempo = fechaStr, 
+                    tipo = if (imagen != null) ReporteTipo.ALERTA else ReporteTipo.INFORMACION,
+                    imagen = imagen,
+                    estado = if (imagen != null) "Retrasada (Validando)" else "EstadoChofer_$estado" // Marcador
+                )
             )
-        )
+        }
         
         historial.add(0, ChoferHistorialAccion("Ruta 05", estado, fechaStr, icono, color))
     }
 
-    // Filtrado de notificaciones para el chofer
+    // Filtrado de notificaciones para el chofer: incluye avisos de horario y respuestas del admin
     val notificacionesChofer = ReporteRepository.reportes.filter { reporte ->
         reporte.unidad == SessionManager.numeroUnidad && (
-            reporte.estado == "HorarioAsignado" || 
-            (reporte.estado == null || !reporte.estado!!.startsWith("EstadoChofer_"))
+            reporte.estado == "HorarioAsignado" || reporte.validacionAdmin != null
         )
     }
 
@@ -133,7 +137,7 @@ fun HomeChoferScreen(
                         DropdownMenu(
                             expanded = showNotifications,
                             onDismissRequest = { showNotifications = false },
-                            modifier = Modifier.width(300.dp).background(Color.White)
+                            modifier = Modifier.width(320.dp).background(Color.White)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -147,19 +151,40 @@ fun HomeChoferScreen(
                                 Text("No hay avisos nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
                             } else {
                                 notificacionesChofer.take(10).forEach { reporte ->
+                                    val esRespuestaAdmin = reporte.validacionAdmin != null
+                                    
                                     DropdownMenuItem(
                                         text = { 
                                             Column {
-                                                Text(reporte.mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                if (esRespuestaAdmin) {
+                                                    Text(
+                                                        text = "Respuesta a retraso: ${reporte.validacionAdmin}",
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = if (reporte.validacionAdmin == "Aceptado") Color(0xFF27AE60) else Color.Red,
+                                                        fontSize = 13.sp
+                                                    )
+                                                    Text(reporte.mensaje, fontSize = 11.sp, maxLines = 1)
+                                                } else {
+                                                    Text(reporte.mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                }
                                                 Text(reporte.tiempo, fontSize = 10.sp, color = Color.Gray)
                                             }
                                         },
                                         onClick = { showNotifications = false },
                                         leadingIcon = { 
                                             Icon(
-                                                if (reporte.estado == "HorarioAsignado") Icons.Default.Schedule else Icons.Default.School,
+                                                when {
+                                                    reporte.validacionAdmin == "Aceptado" -> Icons.Default.CheckCircle
+                                                    reporte.validacionAdmin == "Denegado" -> Icons.Default.Cancel
+                                                    reporte.estado == "HorarioAsignado" -> Icons.Default.Schedule
+                                                    else -> Icons.Default.School
+                                                },
                                                 contentDescription = null, 
-                                                tint = vinoUpt
+                                                tint = when {
+                                                    reporte.validacionAdmin == "Aceptado" -> Color(0xFF27AE60)
+                                                    reporte.validacionAdmin == "Denegado" -> Color.Red
+                                                    else -> vinoUpt
+                                                }
                                             ) 
                                         }
                                     )
@@ -263,7 +288,7 @@ fun ChoferInicioSection(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            "Ruta 05", 
+                            "Unidad X (${SessionManager.numeroUnidad.ifBlank { "S/N" }})", 
                             color = Color.White, 
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), 
                             fontSize = 13.sp, 
@@ -313,7 +338,7 @@ fun ChoferInicioSection(
                 Text("En recorrido", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatusGridButton("Retrasada", Icons.Default.CameraAlt, Color(0xFFE67E22), Modifier.weight(1f)) {
@@ -356,12 +381,17 @@ fun ChoferInicioSection(
                         Text("No hay paradas asignadas", color = Color.Gray)
                     } else {
                         paradas.forEachIndexed { index, parada ->
+                            var isPassed by remember { mutableStateOf(false) }
                             ChoferStopItem(
-                                name = parada, 
-                                time = "--:--", 
-                                active = false, 
+                                name = parada.nombre, 
+                                time = if (isPassed) "Completada" else "--:--", 
+                                active = isPassed, 
                                 isFirst = index == 0,
-                                isLast = index == paradas.size - 1
+                                isLast = index == paradas.size - 1,
+                                onPassed = {
+                                    isPassed = true
+                                    getPlatform().showNotification("Ruta UPT", "Has notificado el paso por: ${parada.nombre}")
+                                }
                             )
                         }
                     }
@@ -491,15 +521,32 @@ fun ChoferHistorialItem(accion: ChoferHistorialAccion) {
 }
 
 @Composable
-fun ChoferStopItem(name: String, time: String, active: Boolean, isFirst: Boolean = false, isLast: Boolean = false, color: Color = Color.Black) {
+fun ChoferStopItem(
+    name: String, 
+    time: String, 
+    active: Boolean, 
+    isFirst: Boolean = false, 
+    isLast: Boolean = false, 
+    color: Color = Color.Black,
+    onPassed: () -> Unit = {}
+) {
     Row(modifier = Modifier.height(55.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.width(30.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
             if (!isFirst) Box(modifier = Modifier.width(2.dp).fillMaxHeight(0.5f).align(Alignment.TopCenter).background(Color.LightGray))
             if (!isLast) Box(modifier = Modifier.width(2.dp).fillMaxHeight(0.5f).align(Alignment.BottomCenter).background(Color.LightGray))
-            Box(modifier = Modifier.size(12.dp).background(if(active) Color.Black else color, CircleShape))
+            Box(modifier = Modifier.size(12.dp).background(if(active) Color(0xFF2E7D32) else color, CircleShape))
         }
         Spacer(Modifier.width(16.dp))
         Text(name, modifier = Modifier.weight(1f), fontSize = 16.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
+        
+        IconButton(onClick = onPassed) {
+            Icon(
+                if (active) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, 
+                contentDescription = "Marcar como pasada", 
+                tint = if (active) Color(0xFF2E7D32) else Color.LightGray
+            )
+        }
+
         Text(time, color = Color.Gray, fontSize = 13.sp)
     }
 }

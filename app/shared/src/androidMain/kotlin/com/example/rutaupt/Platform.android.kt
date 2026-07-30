@@ -3,7 +3,9 @@ package com.example.rutaupt
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Build
 import android.util.Base64
 import androidx.compose.runtime.Composable
@@ -45,6 +47,18 @@ class AndroidPlatform(private val context: Context?) : Platform {
         val launcher = CameraBridge.onLaunchCamera
         if (launcher != null) {
             launcher(onSuccess)
+        }
+    }
+
+    override fun openUrl(url: String) {
+        context?.let { ctx ->
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                ctx.startActivity(intent)
+            } catch (e: Exception) {
+                // Error al abrir URL
+            }
         }
     }
 }

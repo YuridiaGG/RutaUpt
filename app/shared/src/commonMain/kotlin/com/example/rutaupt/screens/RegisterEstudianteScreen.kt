@@ -3,6 +3,7 @@ package com.example.rutaupt.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -13,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -41,6 +43,11 @@ fun RegisterEstudianteScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val authService = remember { AuthApiService() }
+
+    fun isEmailValid(email: String): Boolean {
+        val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$"
+        return email.matches(Regex(emailRegex))
+    }
 
     Scaffold(
         topBar = {
@@ -97,13 +104,14 @@ fun RegisterEstudianteScreen(
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Email, null) },
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading
+                enabled = !isLoading,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Contraseña") },
+                label = { Text("Contraseña (mín. 8 caracteres)") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
@@ -138,12 +146,16 @@ fun RegisterEstudianteScreen(
                         scope.launch { snackbarHostState.showSnackbar("Complete todos los campos") }
                         return@Button
                     }
-                    if (password != confirmPassword) {
-                        scope.launch { snackbarHostState.showSnackbar("Las contraseñas no coinciden") }
+                    if (!isEmailValid(email.trim()) || !email.endsWith("@upt.edu.mx")) {
+                        scope.launch { snackbarHostState.showSnackbar("Usa un correo válido @upt.edu.mx") }
                         return@Button
                     }
-                    if (!email.endsWith("@upt.edu.mx")) {
-                        scope.launch { snackbarHostState.showSnackbar("Usa un correo @upt.edu.mx") }
+                    if (password.length < 8) {
+                        scope.launch { snackbarHostState.showSnackbar("La contraseña debe tener al menos 8 caracteres") }
+                        return@Button
+                    }
+                    if (password != confirmPassword) {
+                        scope.launch { snackbarHostState.showSnackbar("Las contraseñas no coinciden") }
                         return@Button
                     }
 

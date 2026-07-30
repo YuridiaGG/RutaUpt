@@ -3,6 +3,7 @@ package com.example.rutaupt.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -12,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -27,6 +29,8 @@ fun FormularioChoferScreen(
     onVolver: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    
     var nombre by remember { mutableStateOf(choferElegido?.nombre ?: "") }
     var apellidos by remember { mutableStateOf(choferElegido?.apellidos ?: "") }
     var edad by remember { mutableStateOf(choferElegido?.edad ?: "") }
@@ -38,6 +42,11 @@ fun FormularioChoferScreen(
     var passwordVisible by remember { mutableStateOf(false) }
 
     val vinoUpt = UPTColors.Vino
+
+    fun isEmailValid(email: String): Boolean {
+        val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$"
+        return email.matches(Regex(emailRegex))
+    }
 
     Scaffold(
         topBar = {
@@ -53,7 +62,8 @@ fun FormularioChoferScreen(
                     titleContentColor = vinoUpt
                 )
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -82,10 +92,11 @@ fun FormularioChoferScreen(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = edad,
-                    onValueChange = { edad = it },
+                    onValueChange = { if(it.length <= 3 && it.all { c -> c.isDigit() }) edad = it },
                     label = { Text("Edad") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
                 OutlinedTextField(
                     value = numeroUnidad,
@@ -98,11 +109,12 @@ fun FormularioChoferScreen(
 
             OutlinedTextField(
                 value = telefono,
-                onValueChange = { telefono = it },
-                label = { Text("Número de Teléfono") },
+                onValueChange = { if(it.length <= 10 && it.all { c -> c.isDigit() }) telefono = it },
+                label = { Text("Número de Teléfono (10 dígitos)") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Phone, null) },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone)
             )
 
             OutlinedTextField(
@@ -111,13 +123,14 @@ fun FormularioChoferScreen(
                 label = { Text("Correo Electrónico") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Email, null) },
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
 
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Contraseña") },
+                label = { Text("Contraseña (mín. 8 caracteres)") },
                 modifier = Modifier.fillMaxWidth(),
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
@@ -146,30 +159,50 @@ fun FormularioChoferScreen(
 
             Button(
                 onClick = {
-                    if (nombre.isNotBlank() && email.isNotBlank()) {
-                        scope.launch {
-                            val chofer = Chofer(
-                                id = choferElegido?.id ?: 0,
-                                nombre = nombre,
-                                apellidos = apellidos,
-                                edad = edad,
-                                telefono = telefono,
-                                numeroUnidad = numeroUnidad,
-                                email = email,
-                                contrasena = password
-                            )
-                            
-                            val exito = if (choferElegido == null) {
-                                ChoferRepository.registrarChofer(chofer)
-                            } else {
-                                // De momento asumimos éxito para la edición local si no hay endpoint de update aún
-                                // O podrías implementar ChoferRepository.actualizarChofer(chofer)
-                                true 
-                            }
-                            
-                            if (exito) {
-                                onVolver()
-                            }
+                    if (nombre.isBlank() || email.isBlank() || password.isBlank() || telefono.isBlank() || numeroUnidad.isBlank()) {
+                        scope.launch { snackbarHostState.showSnackbar("Complete todos los campos obligatorios") }
+                        return@Button
+                    }
+                    if (!isEmailValid(email.trim())) {
+                        scope.launch { snackbarHostState.showSnackbar("Ingrese un correo válido") }
+                        return@Button
+                    }
+                    if (telefono.length != 10) {
+                        scope.launch { snackbarHostState.showSnackbar("El teléfono debe tener 10 dígitos") }
+                        return@Button
+                    }
+                    if (password.length < 8) {
+                        scope.launch { snackbarHostState.showSnackbar("La contraseña debe tener al menos 8 caracteres") }
+                        return@Button
+                    }
+                    if (password != confirmPassword) {
+                        scope.launch { snackbarHostState.showSnackbar("Las contraseñas no coinciden") }
+                        return@Button
+                    }
+
+                    scope.launch {
+                        val chofer = Chofer(
+                            id = choferElegido?.id ?: 0,
+                            nombre = nombre.trim(),
+                            apellidos = apellidos.trim(),
+                            edad = edad.trim(),
+                            telefono = telefono.trim(),
+                            numeroUnidad = numeroUnidad.trim().uppercase(),
+                            email = email.lowercase().trim(),
+                            contrasena = password
+                        )
+                        
+                        val exito = if (choferElegido == null) {
+                            ChoferRepository.registrarChofer(chofer)
+                        } else {
+                            // En el futuro implementar ChoferRepository.actualizarChofer(chofer)
+                            true 
+                        }
+                        
+                        if (exito) {
+                            onVolver()
+                        } else {
+                            snackbarHostState.showSnackbar("Error al procesar los datos")
                         }
                     }
                 },

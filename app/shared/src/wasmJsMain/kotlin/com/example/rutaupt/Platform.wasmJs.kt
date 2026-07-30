@@ -7,6 +7,7 @@ class WasmPlatform: Platform {
     override val name: String = "Web with Kotlin/Wasm"
     override fun showNotification(title: String, message: String) {}
     override fun openCamera(onSuccess: (String) -> Unit) {}
+    override fun openUrl(url: String) {}
 }
 
 actual fun getPlatform(): Platform = WasmPlatform()

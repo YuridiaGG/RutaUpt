@@ -20,4 +20,4 @@ RUN mkdir /app
 
 COPY --from=build /home/gradle/src/server/build/libs/*.jar /app/ktor-server.jar
 
-ENTRYPOINT ["java","-jar","/app/ktor-server.jar"]
+ENTRYPOINT ["java", "-Djava.net.preferIPv4Stack=true", "-jar", "/app/ktor-server.jar"]

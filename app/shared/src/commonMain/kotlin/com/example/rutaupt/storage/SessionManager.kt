@@ -81,7 +81,8 @@ object SessionManager {
         apellidosUsuario = ""
         emailUsuario = ""
         passwordUsuario = ""
-        rolUsuario = ""
+        // No cerramos la sesión del rol para mantener el contexto de la aplicación
+        // rolUsuario = ""
         numeroUnidad = ""
         telefonoUsuario = ""
         edadUsuario = ""

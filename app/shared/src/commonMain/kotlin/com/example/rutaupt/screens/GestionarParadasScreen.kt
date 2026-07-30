@@ -27,7 +27,8 @@ fun GestionarParadasScreen(
 ) {
     val vinoUpt = UPTColors.Vino
     val paradas = ParadaRepository.paradas
-    var nuevaParada by remember { mutableStateOf("") }
+    var nombreParada by remember { mutableStateOf("") }
+    var linkUbicacion by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var isLoading by remember { mutableStateOf(false) }
@@ -58,24 +59,36 @@ fun GestionarParadasScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             Text(
-                "Establece las paradas generales para todas las unidades:",
+                "Establece las paradas y sus ubicaciones (links de Google Maps):",
                 color = Color.Gray,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
             OutlinedTextField(
-                value = nuevaParada,
-                onValueChange = { nuevaParada = it },
+                value = nombreParada,
+                onValueChange = { nombreParada = it },
                 label = { Text("Nombre de la parada") },
                 modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = linkUbicacion,
+                onValueChange = { linkUbicacion = it },
+                label = { Text("Link de Google Maps") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
                 trailingIcon = {
                     IconButton(onClick = {
-                        if (nuevaParada.isNotBlank()) {
+                        if (nombreParada.isNotBlank()) {
                             scope.launch {
-                                val success = ParadaRepository.agregarParada(nuevaParada)
+                                val success = ParadaRepository.agregarParada(nombreParada, linkUbicacion.ifBlank { null })
                                 if (success) {
-                                    nuevaParada = ""
+                                    nombreParada = ""
+                                    linkUbicacion = ""
                                     snackbarHostState.showSnackbar("Parada agregada correctamente")
                                 } else {
                                     snackbarHostState.showSnackbar("Error al guardar en el servidor")
@@ -96,7 +109,7 @@ fun GestionarParadasScreen(
                 }
             } else if (paradas.isEmpty()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("No hay paradas registradas en la base de datos", color = Color.LightGray)
+                    Text("No hay paradas registradas", color = Color.LightGray)
                 }
             } else {
                 LazyColumn(
@@ -115,10 +128,15 @@ fun GestionarParadasScreen(
                             ) {
                                 Icon(Icons.Default.LocationOn, contentDescription = null, tint = vinoUpt)
                                 Spacer(Modifier.width(16.dp))
-                                Text(parada, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(parada.nombre, fontWeight = FontWeight.Bold)
+                                    if (!parada.ubicacion.isNullOrBlank()) {
+                                        Text(parada.ubicacion!!, fontSize = 11.sp, color = Color.Gray, maxLines = 1)
+                                    }
+                                }
                                 IconButton(onClick = { 
                                     scope.launch {
-                                        val success = ParadaRepository.eliminarParada(parada)
+                                        val success = ParadaRepository.eliminarParada(parada.nombre)
                                         if (success) {
                                             snackbarHostState.showSnackbar("Parada eliminada")
                                         } else {

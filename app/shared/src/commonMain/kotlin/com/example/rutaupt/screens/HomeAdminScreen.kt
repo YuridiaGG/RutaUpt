@@ -14,11 +14,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -29,11 +31,15 @@ import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.rememberBitmapFromBase64
 import com.example.rutaupt.LocationBridge
 import com.example.rutaupt.model.ReporteTipo
+import com.example.rutaupt.model.ReporteUnidad
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.storage.SessionManager
 import com.example.rutaupt.storage.ParadaRepository
 import com.example.rutaupt.api.RutaApiService
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +58,7 @@ fun HomeAdminScreen(
     val vinoUpt = UPTColors.Vino
     val vinoOscuro = UPTColors.VinoOscuro
     val apiService = remember { RutaApiService() }
+    val scope = rememberCoroutineScope()
     
     var stats by remember { mutableStateOf(mapOf("estudiantes" to 0, "choferes" to 0, "rutas" to 0)) }
     var showMenu by remember { mutableStateOf(false) }
@@ -72,6 +79,12 @@ fun HomeAdminScreen(
         }
         stats = apiService.obtenerEstadisticasAdmin()
         ParadaRepository.cargarParadas()
+        
+        // Polling para actualizaciones en tiempo real (cada 10 segundos)
+        while(true) {
+            ReporteRepository.cargarReportes()
+            delay(10000)
+        }
     }
 
     LaunchedEffect(mensajeConfirmacion) {
@@ -84,6 +97,31 @@ fun HomeAdminScreen(
     // Filtro de Notificaciones para Admin: Estados operativos de los choferes
     val notificacionesAdmin = ReporteRepository.reportes.filter { 
         it.estado != null && it.estado!!.startsWith("EstadoChofer_") 
+    }
+
+    // Procesar datos para la gráfica de barras
+    val chartData by remember {
+        derivedStateOf {
+            val counts = IntArray(7) { 0 }
+            ReporteRepository.reportes.forEach { reporte ->
+                val esRetraso = reporte.estado?.contains("Retrasada", ignoreCase = true) == true || 
+                                reporte.mensaje.contains("retraso", ignoreCase = true)
+                
+                if (esRetraso) {
+                    try {
+                        val reportDate = kotlinx.datetime.Instant.fromEpochMilliseconds(reporte.id)
+                            .toLocalDateTime(TimeZone.currentSystemDefault())
+                        val dayIndex = reportDate.dayOfWeek.ordinal
+                        if (dayIndex in 0..6) {
+                            counts[dayIndex]++
+                        }
+                    } catch (e: Exception) {}
+                }
+            }
+            
+            val maxCount = counts.maxOrNull()?.takeIf { it > 0 } ?: 1
+            counts.map { it.toFloat() / maxCount }
+        }
     }
 
     Scaffold(
@@ -109,7 +147,7 @@ fun HomeAdminScreen(
                         DropdownMenu(
                             expanded = showNotifications,
                             onDismissRequest = { showNotifications = false },
-                            modifier = Modifier.width(300.dp).background(Color.White)
+                            modifier = Modifier.width(320.dp).background(Color.White)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -122,15 +160,23 @@ fun HomeAdminScreen(
                             if (notificacionesAdmin.isEmpty()) {
                                 Text("No hay reportes de choferes", modifier = Modifier.padding(16.dp), color = Color.Gray)
                             } else {
-                                notificacionesAdmin.take(10).forEach { reporte ->
+                                notificacionesAdmin.take(15).forEach { reporte ->
                                     RecentNotificationItem(
-                                        mensaje = reporte.mensaje, 
-                                        tiempo = reporte.tiempo, 
-                                        iconBg = if(reporte.tipo == ReporteTipo.ALERTA) Color.Red else Color(0xFFF39C12), 
-                                        icon = if(reporte.tipo == ReporteTipo.ALERTA) Icons.Default.Warning else Icons.Default.BusAlert,
-                                        imagenBase64 = reporte.imagen,
+                                        reporte = reporte,
                                         onClick = { showNotifications = false; onVerReportes() },
-                                        onDelete = { ReporteRepository.eliminarReporte(reporte.id) }
+                                        onDelete = { 
+                                            scope.launch {
+                                                ReporteRepository.eliminarReporte(reporte.id)
+                                            }
+                                        },
+                                        onValidar = { nuevoEstado ->
+                                            scope.launch {
+                                                val success = ReporteRepository.actualizarValidacion(reporte.id, nuevoEstado)
+                                                if (success) {
+                                                    snackbarHostState.showSnackbar("Reporte $nuevoEstado correctamente")
+                                                }
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -252,8 +298,9 @@ fun HomeAdminScreen(
 
                 Spacer(modifier = Modifier.height(32.dp))
                 Text("Actividad semanal", fontWeight = FontWeight.Bold, fontSize = 19.sp, color = Color(0xFF333333))
+                Text("¿Cómo va mi ruta? (Basado en reportes reales)", fontSize = 14.sp, color = Color.Gray)
                 Spacer(Modifier.height(16.dp))
-                ActivityChart()
+                ActivityChart(chartData)
                 Spacer(Modifier.height(30.dp))
             }
         }
@@ -294,9 +341,8 @@ fun QuickActionCard(title: String, icon: ImageVector, modifier: Modifier, onClic
 }
 
 @Composable
-fun ActivityChart() {
+fun ActivityChart(chartData: List<Float>) {
     val vinoUpt = UPTColors.Vino
-    val chartData = listOf(0f, 0f, 0f, 0f, 0f, 0f, 0f)
     val days = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 
     Card(
@@ -309,14 +355,26 @@ fun ActivityChart() {
             Canvas(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 val width = size.width
                 val height = size.height
-                val spacing = width / (chartData.size - 1)
-                val path = Path()
+                val barWidth = width / (chartData.size * 1.5f)
+                val spacing = (width - (barWidth * chartData.size)) / (chartData.size + 1)
+                
                 chartData.forEachIndexed { index, value ->
-                    val x = index * spacing
-                    val y = height - (value * height)
-                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                    val x = spacing + index * (barWidth + spacing)
+                    val barHeight = value * height
+                    
+                    drawRect(
+                        color = if (value > 0.6f) Color.Red else vinoUpt,
+                        topLeft = Offset(x, height - barHeight),
+                        size = Size(barWidth, barHeight)
+                    )
                 }
-                drawPath(path = path, color = vinoUpt, style = Stroke(width = 4.dp.toPx()))
+                
+                drawLine(
+                    color = Color.LightGray,
+                    start = Offset(0f, height),
+                    end = Offset(width, height),
+                    strokeWidth = 2.dp.toPx()
+                )
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -328,25 +386,82 @@ fun ActivityChart() {
 
 @Composable
 fun RecentNotificationItem(
-    mensaje: String, tiempo: String, iconBg: Color, icon: ImageVector,
-    imagenBase64: String? = null, onClick: () -> Unit, onDelete: () -> Unit
+    reporte: ReporteUnidad,
+    onClick: () -> Unit,
+    onDelete: () -> Unit,
+    onValidar: (String) -> Unit
 ) {
+    val iconBg = if(reporte.tipo == ReporteTipo.ALERTA) Color.Red else Color(0xFFF39C12)
+    val icon = if(reporte.tipo == ReporteTipo.ALERTA) Icons.Default.Warning else Icons.Default.BusAlert
+    val bitmap = rememberBitmapFromBase64(reporte.imagen)
+    val esRetraso = reporte.estado?.contains("Retrasada", ignoreCase = true) == true || 
+                    reporte.mensaje.contains("retraso", ignoreCase = true)
+
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA))
     ) {
-        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(42.dp).background(iconBg.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = iconBg, modifier = Modifier.size(20.dp))
+        Column(Modifier.padding(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(42.dp).background(iconBg.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, tint = iconBg, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(reporte.mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black, maxLines = 2)
+                    Text(reporte.tiempo, fontSize = 10.sp, color = Color.Gray)
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Delete, null, tint = Color.LightGray, modifier = Modifier.size(18.dp))
+                }
             }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.Black, maxLines = 1)
-                Text(tiempo, fontSize = 10.sp, color = Color.Gray)
+            
+            if (bitmap != null) {
+                Spacer(Modifier.height(8.dp))
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = "Imagen del reporte",
+                    modifier = Modifier.fillMaxWidth().height(160.dp).clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Crop
+                )
             }
-            IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Delete, null, tint = Color.LightGray, modifier = Modifier.size(18.dp))
+
+            if (esRetraso && reporte.validacionAdmin == null) {
+                Spacer(Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(
+                        onClick = { onValidar("Denegado") },
+                        modifier = Modifier.height(32.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Text("Denegar", color = Color.Red, fontSize = 12.sp)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = { onValidar("Aceptado") },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF27AE60)),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Aceptar", color = Color.White, fontSize = 12.sp)
+                    }
+                }
+            } else if (reporte.validacionAdmin != null) {
+                Spacer(Modifier.height(6.dp))
+                Surface(
+                    color = (if (reporte.validacionAdmin == "Aceptado") Color(0xFF27AE60) else Color.Red).copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Text(
+                        text = "Admin: ${reporte.validacionAdmin}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (reporte.validacionAdmin == "Aceptado") Color(0xFF27AE60) else Color.Red,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
         }
     }

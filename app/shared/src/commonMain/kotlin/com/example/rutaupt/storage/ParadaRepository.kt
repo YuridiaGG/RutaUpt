@@ -2,34 +2,29 @@ package com.example.rutaupt.storage
 
 import androidx.compose.runtime.mutableStateListOf
 import com.example.rutaupt.api.RutaApiService
+import com.example.rutaupt.api.Parada
 
 object ParadaRepository {
-    val paradas = mutableStateListOf<String>()
+    val paradas = mutableStateListOf<Parada>()
     private val apiService = RutaApiService()
 
     suspend fun cargarParadas() {
         try {
             val remoteParadas = apiService.obtenerParadas()
-            if (remoteParadas.isNotEmpty()) {
-                paradas.clear()
-                paradas.addAll(remoteParadas)
-            }
+            paradas.clear()
+            paradas.addAll(remoteParadas)
         } catch (e: Exception) {
-            // Silencioso para no interrumpir la UI
+            // Silencioso
         }
     }
 
-    suspend fun agregarParada(nombre: String): Boolean {
-        if (nombre.isNotBlank() && !paradas.contains(nombre)) {
-            // Añadimos localmente primero (UI Optimista)
-            paradas.add(nombre)
-            
-            // Intentamos guardar en el servidor
+    suspend fun agregarParada(nombre: String, ubicacion: String? = null): Boolean {
+        if (nombre.isNotBlank()) {
+            val nuevaParada = Parada(nombre = nombre, ubicacion = ubicacion)
             return try {
-                val success = apiService.agregarParada(nombre)
-                if (!success) {
-                    // Si falla el servidor, podrías elegir removerla o dejarla local
-                    // paradas.remove(nombre) 
+                val success = apiService.agregarParada(nombre, ubicacion)
+                if (success) {
+                    paradas.add(nuevaParada)
                 }
                 success
             } catch (e: Exception) {
@@ -43,12 +38,11 @@ object ParadaRepository {
         return try {
             val success = apiService.eliminarParada(nombre)
             if (success) {
-                paradas.remove(nombre)
+                paradas.removeAll { it.nombre == nombre }
             }
             success
         } catch (e: Exception) {
-            paradas.remove(nombre) // Eliminamos local aunque falle el server para fluidez
-            true
+            false
         }
     }
     
