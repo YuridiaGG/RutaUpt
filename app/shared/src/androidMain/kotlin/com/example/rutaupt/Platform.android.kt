@@ -20,14 +20,17 @@ class AndroidPlatform(private val context: Context?) : Platform {
     override fun showNotification(title: String, message: String) {
         context?.let { ctx ->
             val notificationManager = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val channelId = "rutaupt_notifications"
+            val channelId = "rutaupt_notifications_v3" // Cambiado para forzar importancia alta
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
                     channelId,
-                    "RutaUPT Notifications",
-                    NotificationManager.IMPORTANCE_DEFAULT
-                )
+                    "RutaUPT Alerts",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Alertas de proximidad y sistema"
+                    enableLights(true)
+                }
                 notificationManager.createNotificationChannel(channel)
             }
 
@@ -35,7 +38,8 @@ class AndroidPlatform(private val context: Context?) : Platform {
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setContentTitle(title)
                 .setContentText(message)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setAutoCancel(true)
                 .build()
 
