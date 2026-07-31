@@ -11,5 +11,6 @@ expect fun MapComponent(
     longitude: Double,
     title: String = "Mi Ubicación",
     paradas: List<Parada> = emptyList(),
-    onParadaSelected: (Parada) -> Unit = {}
+    onParadaSelected: (Parada) -> Unit = {},
+    onMapClick: (Double, Double) -> Unit = { _, _ -> }
 )

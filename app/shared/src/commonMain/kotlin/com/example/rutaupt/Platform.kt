@@ -8,6 +8,7 @@ interface Platform {
     fun showNotification(title: String, message: String)
     fun openCamera(onSuccess: (String) -> Unit)
     fun openUrl(url: String)
+    fun exitApp()
 }
 
 expect fun getPlatform(): Platform

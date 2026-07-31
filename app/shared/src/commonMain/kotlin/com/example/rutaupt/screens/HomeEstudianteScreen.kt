@@ -15,22 +15,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.rutaupt.TrackingService
 import com.example.rutaupt.generated.resources.*
-import com.example.rutaupt.getPlatform
 import com.example.rutaupt.LocationBridge
+import com.example.rutaupt.LocationUtils
 import com.example.rutaupt.model.ReporteUnidad
 import com.example.rutaupt.model.ReporteTipo
 import com.example.rutaupt.storage.ReporteRepository
@@ -42,7 +37,6 @@ import com.example.rutaupt.api.Parada
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
-import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,10 +49,22 @@ fun HomeEstudianteScreen(
     var selectedTab by remember { mutableStateOf("Inicio") }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val apiService = remember { RutaApiService() }
     
     var hasLocationPermission by remember { 
         mutableStateOf(LocationBridge.hasPermission?.invoke() ?: false) 
     }
+
+    // Estados de ubicación y detección
+    var currentUserLat by remember { mutableStateOf<Double?>(null) }
+    var currentUserLon by remember { mutableStateOf<Double?>(null) }
+    var isUserMoving by remember { mutableStateOf(false) }
+    var lastLat by remember { mutableStateOf<Double?>(null) }
+    var lastLon by remember { mutableStateOf<Double?>(null) }
+
+    var nearbyUnit by remember { mutableStateOf<UbicacionVehiculo?>(null) }
+    var lastNotifiedUnitId by remember { mutableStateOf<String?>(null) }
+    var showNotifications by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         if (!hasLocationPermission) {
@@ -69,24 +75,77 @@ fun HomeEstudianteScreen(
         ParadaRepository.cargarParadas()
         ReporteRepository.cargarReportes()
         
-        // Polling constante para ver si el chofer marcó una parada
-        while(true) {
-            ReporteRepository.cargarReportes()
-            delay(10000)
+        launch {
+            while(true) {
+                ReporteRepository.cargarReportes()
+                ParadaRepository.cargarParadas()
+                delay(15000)
+            }
+        }
+
+        launch {
+            while(true) {
+                try {
+                    val lat = currentUserLat ?: LocationUtils.DEFAULT_LAT
+                    val lon = currentUserLon ?: LocationUtils.DEFAULT_LON
+                    val ubicaciones = apiService.obtenerUbicaciones()
+                    
+                    if (ubicaciones.isNotEmpty()) {
+                        val closestPair = ubicaciones.map { unit ->
+                            unit to LocationUtils.calcularDistanciaMetros(lat, lon, unit.latitud, unit.longitud)
+                        }.minByOrNull { it.second }
+
+                        val closest = closestPair?.first
+                        val distance = closestPair?.second ?: Double.MAX_VALUE
+
+                        if (closest != null && distance < 200000) { 
+                            if (closest.unidad != lastNotifiedUnitId) {
+                                lastNotifiedUnitId = closest.unidad
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("¡Unidad ${closest.unidad} detectada!")
+                                }
+                            }
+                            nearbyUnit = closest
+                        } else {
+                            nearbyUnit = null
+                            lastNotifiedUnitId = null
+                        }
+                    } else {
+                        nearbyUnit = null
+                    }
+                } catch (e: Exception) {}
+                delay(5000)
+            }
         }
     }
 
-    var showNotifications by remember { mutableStateOf(false) }
-    
-    // FILTRO: Avisos de interés para el estudiante
+    // Suscripción al GPS
+    DisposableEffect(hasLocationPermission) {
+        if (hasLocationPermission) {
+            LocationBridge.getCurrentLocation?.invoke { lat, lon -> 
+                currentUserLat = lat
+                currentUserLon = lon 
+            }
+            LocationBridge.onLocationUpdate = { lat, lon -> 
+                val pLat = lastLat
+                val pLon = lastLon
+                if (pLat != null && pLon != null) {
+                    val d = LocationUtils.calcularDistanciaMetros(pLat, pLon, lat, lon)
+                    isUserMoving = d > 1.2 
+                }
+                currentUserLat = lat
+                currentUserLon = lon 
+                lastLat = lat
+                lastLon = lon
+            }
+            LocationBridge.startLocationUpdates?.invoke()
+        }
+        onDispose { LocationBridge.stopLocationUpdates?.invoke() }
+    }
+
     val avisosEstudiante = ReporteRepository.reportes.filter { 
         it.mensaje.startsWith("Anónimo:") || it.estado == "Unidad llena" || it.estado == "Disponible" || it.estado?.startsWith("ParadaPasada_") == true
     }
-
-    // Lógica de notificaciones leídas
-    var lastSeenNotificationCount by remember { mutableStateOf(0) }
-    val currentNotificationCount = avisosEstudiante.size
-    val unreadCount = (currentNotificationCount - lastSeenNotificationCount).coerceAtLeast(0)
 
     Scaffold(
         topBar = {
@@ -94,19 +153,8 @@ fun HomeEstudianteScreen(
                 title = { Text(if(selectedTab == "Inicio") "Estudiante" else "Avisos de Ruta", color = Color.White, fontWeight = FontWeight.Bold) },
                 actions = {
                     Box {
-                        IconButton(onClick = { 
-                            showNotifications = true 
-                            lastSeenNotificationCount = currentNotificationCount // Marcar como leídas al abrir
-                        }) {
-                            BadgedBox(
-                                badge = { 
-                                    if (unreadCount > 0) {
-                                        Badge { Text(unreadCount.toString()) }
-                                    }
-                                }
-                            ) {
-                                Icon(Icons.Default.Notifications, contentDescription = "Notificaciones", tint = Color.White)
-                            }
+                        IconButton(onClick = { showNotifications = true }) {
+                            Icon(Icons.Default.Notifications, null, tint = Color.White)
                         }
                         DropdownMenu(
                             expanded = showNotifications,
@@ -139,21 +187,21 @@ fun HomeEstudianteScreen(
         bottomBar = {
             NavigationBar(containerColor = Color.White, modifier = Modifier.shadow(8.dp)) {
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Inicio") },
+                    icon = { Icon(Icons.Default.Home, null) },
                     label = { Text("Inicio") },
                     selected = selectedTab == "Inicio",
                     onClick = { selectedTab = "Inicio" },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = vinoUpt, indicatorColor = vinoUpt.copy(alpha = 0.1f))
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Notifications, contentDescription = "Avisos") },
+                    icon = { Icon(Icons.Default.Notifications, null) },
                     label = { Text("Avisos") },
                     selected = selectedTab == "Avisos",
                     onClick = { selectedTab = "Avisos" },
                     colors = NavigationBarItemDefaults.colors(selectedIconColor = vinoUpt, indicatorColor = vinoUpt.copy(alpha = 0.1f))
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Perfil") },
+                    icon = { Icon(Icons.Default.Person, null) },
                     label = { Text("Perfil") },
                     selected = false,
                     onClick = onNavigateToProfile
@@ -165,21 +213,30 @@ fun HomeEstudianteScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFFF5F5F5))) {
             AnimatedContent(targetState = selectedTab) { tab ->
                 when (tab) {
-                    "Inicio" -> InicioSection(vinoUpt, vinoOscuro, hasLocationPermission, onNavigateToRuta) { mensaje ->
-                        if (SessionManager.puedeEnviarReporte()) {
-                            scope.launch {
-                                val nuevoReporte = ReporteUnidad(
-                                    unidad = SessionManager.numeroUnidad.ifBlank { "Estudiante" },
-                                    mensaje = "Anónimo: $mensaje",
-                                    tiempo = "Ahora",
-                                    tipo = ReporteTipo.INFORMACION
-                                )
-                                ReporteRepository.agregarReporte(nuevoReporte)
-                                SessionManager.registrarEnvioReporte()
-                                snackbarHostState.showSnackbar("Aviso enviado correctamente")
+                    "Inicio" -> InicioSection(
+                        vinoUpt = vinoUpt, 
+                        vinoOscuro = vinoOscuro, 
+                        nearbyUnit = nearbyUnit,
+                        currentUserLat = currentUserLat,
+                        currentUserLon = currentUserLon,
+                        isUserMoving = isUserMoving,
+                        onNavigateToRuta = onNavigateToRuta,
+                        onSendReport = { mensaje ->
+                            if (SessionManager.puedeEnviarReporte()) {
+                                scope.launch {
+                                    val nuevoReporte = ReporteUnidad(
+                                        unidad = SessionManager.numeroUnidad.ifBlank { "Estudiante" },
+                                        mensaje = "Anónimo: $mensaje",
+                                        tiempo = "Ahora",
+                                        tipo = ReporteTipo.INFORMACION
+                                    )
+                                    ReporteRepository.agregarReporte(nuevoReporte)
+                                    SessionManager.registrarEnvioReporte()
+                                    snackbarHostState.showSnackbar("Aviso enviado")
+                                }
                             }
                         }
-                    }
+                    )
                     "Avisos" -> AvisosSection(vinoUpt)
                 }
             }
@@ -188,21 +245,18 @@ fun HomeEstudianteScreen(
 }
 
 @Composable
-fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onNavigateToRuta: (Parada?) -> Unit, onSendReport: (String) -> Unit) {
-    val apiService = remember { RutaApiService() }
-    var currentUserLat by remember { mutableStateOf<Double?>(null) }
-    var currentUserLon by remember { mutableStateOf<Double?>(null) }
-
-    DisposableEffect(hasPermission) {
-        if (hasPermission) {
-            LocationBridge.getCurrentLocation?.invoke { lat, lon -> currentUserLat = lat; currentUserLon = lon }
-            LocationBridge.onLocationUpdate = { lat, lon -> currentUserLat = lat; currentUserLon = lon }
-            LocationBridge.startLocationUpdates?.invoke()
-        }
-        onDispose { LocationBridge.stopLocationUpdates?.invoke() }
-    }
-
+fun InicioSection(
+    vinoUpt: Color, 
+    vinoOscuro: Color, 
+    nearbyUnit: UbicacionVehiculo?,
+    currentUserLat: Double?,
+    currentUserLon: Double?,
+    isUserMoving: Boolean,
+    onNavigateToRuta: (Parada?) -> Unit,
+    onSendReport: (String) -> Unit
+) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        // Cabecera Bienvenida
         Box(modifier = Modifier.fillMaxWidth().height(160.dp).background(Brush.verticalGradient(listOf(vinoUpt, vinoOscuro)), RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)).padding(horizontal = 24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -214,13 +268,39 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
         }
 
         Column(modifier = Modifier.padding(16.dp)) {
+            
+            // --- SECCIÓN: MI RUTA (TARJETA GEMINI) ---
+            SectionTitle("Mi ruta")
+            
+            val microParaMostrar = nearbyUnit ?: UbicacionVehiculo("12", 20.14, -98.32, 0L)
+            val currentLat = currentUserLat ?: LocationUtils.DEFAULT_LAT
+            val currentLon = currentUserLon ?: LocationUtils.DEFAULT_LON
+            
+            val dist = if (nearbyUnit != null) {
+                LocationUtils.calcularDistanciaMetros(currentLat, currentLon, nearbyUnit.latitud, nearbyUnit.longitud)
+            } else 97600.0
+
+            NearbyUnitCard(
+                unidad = microParaMostrar.unidad,
+                distMetros = dist,
+                vinoUpt = vinoUpt,
+                estaEnMovimiento = isUserMoving,
+                onClick = { onNavigateToRuta(null) }
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
             SectionTitle("Mi ubicación")
-            Card(modifier = Modifier.fillMaxWidth().height(250.dp).padding(vertical = 8.dp).clickable { onNavigateToRuta(null) }, shape = RoundedCornerShape(16.dp), elevation = CardDefaults.cardElevation(4.dp)) {
+            Card(
+                modifier = Modifier.fillMaxWidth().height(220.dp).padding(vertical = 8.dp)
+                    .clickable { onNavigateToRuta(null) }, // Al picarle se amplía el mapa
+                shape = RoundedCornerShape(16.dp), 
+                elevation = CardDefaults.cardElevation(4.dp)
+            ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     MapComponent(
                         modifier = Modifier.fillMaxSize(),
-                        latitude = currentUserLat ?: com.example.rutaupt.LocationUtils.DEFAULT_LAT,
-                        longitude = currentUserLon ?: com.example.rutaupt.LocationUtils.DEFAULT_LON,
+                        latitude = currentLat,
+                        longitude = currentLon,
                         title = "Mi Ubicación",
                         paradas = ParadaRepository.paradas
                     )
@@ -236,9 +316,20 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
                     } else {
                         paradas.forEachIndexed { index, parada ->
                             val reportePaso = ReporteRepository.reportes.find { it.estado == "ParadaPasada_${parada.nombre}" }
+                            
+                            // Lógica de distancia en km basada en el link (ubicación)
+                            val coordsParada = LocationUtils.extraerCoordenadas(parada.ubicacion)
+                            val sLat = currentUserLat
+                            val sLon = currentUserLon
+                            val distTexto = if (coordsParada != null && sLat != null && sLon != null) {
+                                val m = LocationUtils.calcularDistanciaMetros(sLat, sLon, coordsParada.first, coordsParada.second)
+                                val km = m / 1000.0
+                                " • ${((km * 10).toInt() / 10.0)} km"
+                            } else ""
+
                             StopItem(
                                 name = parada.nombre,
-                                status = if (reportePaso != null) "Ya pasó Unidad ${reportePaso.unidad}" else "En espera",
+                                status = (if (reportePaso != null) "Ya pasó Unidad ${reportePaso.unidad}" else "En espera") + distTexto,
                                 isFirst = index == 0,
                                 isLast = index == paradas.size - 1,
                                 color = if (reportePaso != null) Color(0xFF2E7D32) else Color.Gray,
@@ -250,9 +341,15 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
             }
 
             SectionTitle("¿Cómo va mi ruta?")
-            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatusButton("Ya pasó", Icons.Default.CheckCircle, Color(0xFFE8F5E9), Color(0xFF4CAF50), Modifier.weight(1f)) { onSendReport("La unidad ya pasó") }
-                StatusButton("Va llena", Icons.Default.Groups, Color(0xFFFFF3E0), Color(0xFFFF9800), Modifier.weight(1f)) { onSendReport("La unidad va llena") }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatusButton("Ya pasó", Icons.Default.CheckCircle, Color(0xFFE8F5E9), Color(0xFF4CAF50), Modifier.weight(1f)) { onSendReport("La unidad ya pasó") }
+                    StatusButton("Va llena", Icons.Default.Groups, Color(0xFFFFF3E0), Color(0xFFFF9800), Modifier.weight(1f)) { onSendReport("La unidad va llena") }
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatusButton("Retrasada", Icons.Default.History, Color(0xFFFFEBEE), Color(0xFFD32F2F), Modifier.weight(1f)) { onSendReport("La unidad viene retrasada") }
+                    StatusButton("Todo normal", Icons.Default.ThumbUp, Color(0xFFE3F2FD), Color(0xFF1976D2), Modifier.weight(1f)) { onSendReport("Todo normal por aquí") }
+                }
             }
         }
     }
@@ -283,7 +380,7 @@ fun AvisosSection(vinoUpt: Color) {
 
 @Composable
 fun SectionTitle(title: String) {
-    Text(text = title, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 16.dp, bottom = 8.dp), color = Color(0xFF333333))
+    Text(text = title, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp), color = Color(0xFF333333))
 }
 
 @Composable
@@ -311,20 +408,6 @@ fun StatusButton(text: String, icon: ImageVector, bgColor: Color, iconColor: Col
             Icon(icon, null, tint = iconColor, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text(text, color = iconColor, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        }
-    }
-}
-
-@Composable
-fun RecentReportItem(title: String, time: String, icon: ImageVector, iconColor: Color) {
-    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(1.dp)) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = Color.Gray, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(time, fontSize = 12.sp, color = Color.Gray)
-            }
         }
     }
 }

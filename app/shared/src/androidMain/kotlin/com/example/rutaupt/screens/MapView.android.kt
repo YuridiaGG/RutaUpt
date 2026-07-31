@@ -1,14 +1,18 @@
 package com.example.rutaupt.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.MapsInitializer
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 import com.example.rutaupt.api.Parada
 import com.example.rutaupt.LocationUtils
-import android.location.Location
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import kotlinx.coroutines.launch
 
@@ -19,8 +23,10 @@ actual fun MapComponent(
     longitude: Double,
     title: String,
     paradas: List<Parada>,
-    onParadaSelected: (Parada) -> Unit
+    onParadaSelected: (Parada) -> Unit,
+    onMapClick: (Double, Double) -> Unit
 ) {
+    val context = LocalContext.current
     val centerLocation = LatLng(latitude, longitude)
     val scope = rememberCoroutineScope()
     
@@ -28,41 +34,55 @@ actual fun MapComponent(
         position = CameraPosition.fromLatLngZoom(centerLocation, 15f)
     }
 
-    // Centrar el mapa si cambian las coordenadas (ej: al seleccionar una parada desde la lista o al recibir GPS real)
+    // Inicialización segura del motor de mapas
+    LaunchedEffect(Unit) {
+        try {
+            MapsInitializer.initialize(context)
+        } catch (e: Throwable) {}
+    }
+
+    // Centrado seguro de la cámara
     LaunchedEffect(latitude, longitude) {
-        // Evitamos centrar en el mapamundi (0,0)
         if (latitude != 0.0 && longitude != 0.0) {
-            // Solo animamos si el usuario no está moviendo el mapa manualmente
-            if (cameraPositionState.cameraMoveStartedReason != CameraMoveStartedReason.GESTURE) {
-                cameraPositionState.animate(
-                    update = CameraUpdateFactory.newLatLng(centerLocation),
-                    durationMs = 1000
-                )
-            }
+            try {
+                if (cameraPositionState.cameraMoveStartedReason != CameraMoveStartedReason.GESTURE) {
+                    cameraPositionState.animate(
+                        update = CameraUpdateFactory.newLatLng(centerLocation),
+                        durationMs = 1000
+                    )
+                }
+            } catch (e: Throwable) {}
         }
     }
+
+    // VERIFICACIÓN DE PERMISOS PARA EVITAR SecurityException (Causante de los cierres)
+    val hasFineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    val hasCoarseLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    val canShowLocation = hasFineLocation || hasCoarseLocation
 
     GoogleMap(
         modifier = modifier,
         cameraPositionState = cameraPositionState,
+        onMapClick = { latLng ->
+            onMapClick(latLng.latitude, latLng.longitude)
+        },
         properties = MapProperties(
-            isMyLocationEnabled = true, // Punto azul de ubicación real
+            // Solo activamos la capa de ubicación si Android confirma que tenemos el permiso
+            isMyLocationEnabled = canShowLocation,
             mapType = MapType.NORMAL
         ),
         uiSettings = MapUiSettings(
-            myLocationButtonEnabled = true,
+            myLocationButtonEnabled = canShowLocation,
             zoomControlsEnabled = false,
             mapToolbarEnabled = true,
             compassEnabled = true
         )
     ) {
-        // Marcadores para las paradas (Puntos Rojos)
         paradas.forEach { parada ->
             val coords = LocationUtils.extraerCoordenadas(parada.ubicacion)
             if (coords != null) {
                 val stopLoc = LatLng(coords.first, coords.second)
                 
-                // Calculamos distancia para el marcador
                 val metros = LocationUtils.calcularDistanciaMetros(latitude, longitude, coords.first, coords.second)
                 val distStr = LocationUtils.formatoDistancia(metros)
                 val tiempoMin = LocationUtils.calcularTiempoMinutos(metros)
@@ -75,7 +95,9 @@ actual fun MapComponent(
                     onClick = {
                         onParadaSelected(parada)
                         scope.launch {
-                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(stopLoc, 17f))
+                            try {
+                                cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(stopLoc, 17f))
+                            } catch (e: Exception) {}
                         }
                         false
                     }

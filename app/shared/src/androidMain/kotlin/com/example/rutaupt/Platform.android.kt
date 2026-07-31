@@ -1,5 +1,6 @@
 package com.example.rutaupt
 
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -20,7 +21,7 @@ class AndroidPlatform(private val context: Context?) : Platform {
     override fun showNotification(title: String, message: String) {
         context?.let { ctx ->
             val notificationManager = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val channelId = "rutaupt_notifications_v3" // Cambiado para forzar importancia alta
+            val channelId = "rutaupt_notifications_v3"
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
@@ -61,9 +62,16 @@ class AndroidPlatform(private val context: Context?) : Platform {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 ctx.startActivity(intent)
             } catch (e: Exception) {
-                // Error al abrir URL
             }
         }
+    }
+
+    override fun exitApp() {
+        (context as? Activity)?.finishAffinity() ?: (context as? android.content.ContextWrapper)?.baseContext?.let { 
+            if (it is Activity) it.finishAffinity() 
+        }
+        // Alternativa si el cast falla
+        System.exit(0)
     }
 }
 

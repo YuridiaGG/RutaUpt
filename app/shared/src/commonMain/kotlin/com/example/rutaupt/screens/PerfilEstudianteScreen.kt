@@ -22,6 +22,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rutaupt.getPlatform
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.LocationBridge
+import com.example.rutaupt.LocationUtils
+import com.example.rutaupt.api.RutaApiService
+import com.example.rutaupt.api.UbicacionVehiculo
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,17 +37,58 @@ fun PerfilEstudianteScreen(
     onSaveSuccess: () -> Unit
 ) {
     val vinoUpt = UPTColors.Vino
+    val apiService = remember { RutaApiService() }
     
     var nombre by remember { mutableStateOf(SessionManager.nombreUsuario) }
     var email by remember { mutableStateOf(SessionManager.emailUsuario) }
-    // Ahora obtenemos la contraseña real desde el SessionManager
     var password by remember { mutableStateOf(SessionManager.passwordUsuario) }
     var passwordVisible by remember { mutableStateOf(false) }
+
+    // Estados para detección de micro cercana
+    var currentUserLat by remember { mutableStateOf<Double?>(null) }
+    var currentUserLon by remember { mutableStateOf<Double?>(null) }
+    var nearbyUnit by remember { mutableStateOf<UbicacionVehiculo?>(null) }
+
+    // Iniciar rastreo de ubicación
+    DisposableEffect(Unit) {
+        val hasPermission = LocationBridge.hasPermission?.invoke() ?: false
+        if (hasPermission) {
+            LocationBridge.getCurrentLocation?.invoke { lat, lon -> 
+                currentUserLat = lat
+                currentUserLon = lon 
+            }
+            LocationBridge.onLocationUpdate = { lat, lon -> 
+                currentUserLat = lat
+                currentUserLon = lon 
+            }
+            LocationBridge.startLocationUpdates?.invoke()
+        }
+        onDispose { LocationBridge.stopLocationUpdates?.invoke() }
+    }
+
+    // Lógica de detección de micro cercana
+    LaunchedEffect(currentUserLat, currentUserLon) {
+        if (currentUserLat != null && currentUserLon != null) {
+            while(true) {
+                try {
+                    val ubicaciones = apiService.obtenerUbicaciones()
+                    nearbyUnit = ubicaciones.find { unit ->
+                        val dist = LocationUtils.calcularDistanciaMetros(
+                            currentUserLat!!, currentUserLon!!,
+                            unit.latitud, unit.longitud
+                        )
+                        dist < 1000 
+                    }
+                } catch (e: Exception) {}
+                delay(12000)
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Mi Perfil Estudiante", fontWeight = FontWeight.Bold) },
+                title = { Text("Mi Perfil", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
@@ -63,6 +110,17 @@ fun PerfilEstudianteScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            
+            // --- Card de Micro Cercana (Usa el componente centralizado en CommonComponents.kt) ---
+            if (nearbyUnit != null && currentUserLat != null && currentUserLon != null) {
+                val dist = LocationUtils.calcularDistanciaMetros(
+                    currentUserLat!!, currentUserLon!!,
+                    nearbyUnit!!.latitud, nearbyUnit!!.longitud
+                )
+                NearbyUnitCard(nearbyUnit!!.unidad, dist, vinoUpt)
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // Avatar
             Box(
                 modifier = Modifier
@@ -70,20 +128,10 @@ fun PerfilEstudianteScreen(
                     .background(vinoUpt.copy(alpha = 0.1f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.School, 
-                    contentDescription = null, 
-                    modifier = Modifier.size(50.dp), 
-                    tint = vinoUpt
-                )
+                Icon(Icons.Default.School, null, modifier = Modifier.size(50.dp), tint = vinoUpt)
             }
             
-            Text(
-                text = "Información Personal",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = vinoUpt
-            )
+            Text("Información Personal", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = vinoUpt)
 
             OutlinedTextField(
                 value = nombre,
@@ -112,31 +160,27 @@ fun PerfilEstudianteScreen(
                 leadingIcon = { Icon(Icons.Default.Lock, null) },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Icon(
-                            imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = null,
-                            tint = Color.Gray
-                        )
+                        Icon(if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, null)
                     }
                 },
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 shape = RoundedCornerShape(12.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Button(
                 onClick = {
                     SessionManager.nombreUsuario = nombre
-                    SessionManager.passwordUsuario = password // Guardamos la nueva contraseña si se cambia
-                    getPlatform().showNotification("RutaUPT", "¡Perfil actualizado correctamente!")
+                    SessionManager.passwordUsuario = password
+                    getPlatform().showNotification("RutaUPT", "¡Perfil actualizado!")
                     onSaveSuccess()
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = vinoUpt)
             ) {
-                Text("Guardar Cambios", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text("Guardar Cambios", fontWeight = FontWeight.Bold)
             }
 
             OutlinedButton(
@@ -148,9 +192,9 @@ fun PerfilEstudianteScreen(
                 shape = RoundedCornerShape(28.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
             ) {
-                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.ExitToApp, null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Cerrar Sesión", fontWeight = FontWeight.Bold)
+                Text("Cerrar Sesión")
             }
         }
     }
