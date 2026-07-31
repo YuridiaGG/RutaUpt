@@ -106,21 +106,26 @@ class MainActivity : ComponentActivity() {
         
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         
-        // 1. Obtener ubicación una sola vez
+        // 1. Obtener ubicación con MÁXIMA RAPIDEZ (Fallback a LastLocation)
         LocationBridge.getCurrentLocation = { callback ->
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-
+            if (LocationBridge.hasPermission?.invoke() == true) {
+                // Primero intentamos la última conocida (instantánea)
+                fusedLocationClient.lastLocation.addOnSuccessListener { loc: Location? ->
+                    loc?.let { callback(it.latitude, it.longitude) }
+                }
+                
+                // Luego solicitamos una actualización fresca y precisa
                 fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                    .addOnSuccessListener { location: Location? ->
-                        location?.let { callback(it.latitude, it.longitude) }
+                    .addOnSuccessListener { loc: Location? ->
+                        loc?.let { callback(it.latitude, it.longitude) }
                     }
             }
         }
 
-        // 2. Rastreo en TIEMPO REAL (Como WhatsApp)
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000)
-            .setMinUpdateIntervalMillis(500)
+        // 2. Rastreo en TIEMPO REAL optimizado para fluidez
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000)
+            .setMinUpdateIntervalMillis(1000)
+            .setWaitForAccurateLocation(false)
             .build()
 
         locationCallback = object : LocationCallback() {
@@ -132,7 +137,7 @@ class MainActivity : ComponentActivity() {
         }
 
         LocationBridge.startLocationUpdates = {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            if (LocationBridge.hasPermission?.invoke() == true) {
                 fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
             }
         }
@@ -150,10 +155,4 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         LocationBridge.stopLocationUpdates?.invoke()
     }
-}
-
-@Preview
-@Composable
-fun AppAndroidPreview() {
-    App()
 }

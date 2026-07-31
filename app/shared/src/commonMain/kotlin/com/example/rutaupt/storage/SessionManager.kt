@@ -18,6 +18,9 @@ object SessionManager {
     var edadUsuario by mutableStateOf("")
     var horarioUsuario by mutableStateOf("")
     
+    // Notificaciones leídas (para que el número se quite al abrir)
+    var notificacionesVistasCount by mutableStateOf(0)
+    
     // Lógica para 2 reportes al día
     var reportesEnviadosHoy by mutableStateOf(0)
     var fechaUltimoReporte by mutableStateOf("")
@@ -27,7 +30,7 @@ object SessionManager {
             val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
             "${now.year}-${now.monthNumber}-${now.dayOfMonth}"
         } catch (e: Exception) {
-            "2024-01-01" // Fallback seguro
+            "2024-01-01"
         }
     }
 
@@ -51,8 +54,8 @@ object SessionManager {
         telefonoUsuario = telefono ?: ""
         edadUsuario = edad ?: ""
         horarioUsuario = horario ?: "Sin asignar"
+        notificacionesVistasCount = 0
         
-        // Verificar si debemos reiniciar el contador diario
         val hoy = obtenerFechaActual()
         if (fechaUltimoReporte != hoy) {
             reportesEnviadosHoy = 0
@@ -81,11 +84,10 @@ object SessionManager {
         apellidosUsuario = ""
         emailUsuario = ""
         passwordUsuario = ""
-        // No cerramos la sesión del rol para mantener el contexto de la aplicación
-        // rolUsuario = ""
         numeroUnidad = ""
         telefonoUsuario = ""
         edadUsuario = ""
         horarioUsuario = ""
+        notificacionesVistasCount = 0
     }
 }
