@@ -9,6 +9,7 @@ import com.google.maps.android.compose.*
 import com.example.rutaupt.api.Parada
 import android.location.Location
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import kotlinx.coroutines.launch
 
 @Composable
 actual fun MapComponent(
@@ -20,12 +21,12 @@ actual fun MapComponent(
     onParadaSelected: (Parada) -> Unit
 ) {
     val userLocation = LatLng(latitude, longitude)
+    val scope = rememberCoroutineScope()
     
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(userLocation, 15f)
     }
 
-    // Efecto para centrar la cámara cuando cambia la ubicación del usuario (solo si no hay interacción manual)
     LaunchedEffect(latitude, longitude) {
         if (cameraPositionState.cameraMoveStartedReason != CameraMoveStartedReason.GESTURE) {
             cameraPositionState.animate(
@@ -45,7 +46,8 @@ actual fun MapComponent(
         uiSettings = MapUiSettings(
             myLocationButtonEnabled = true,
             zoomControlsEnabled = false,
-            mapToolbarEnabled = true
+            mapToolbarEnabled = true,
+            compassEnabled = true
         )
     ) {
         // Marcador del Estudiante (Azul)
@@ -60,17 +62,23 @@ actual fun MapComponent(
             val coords = extraerCoordenadas(parada.ubicacion)
             if (coords != null) {
                 val stopLoc = LatLng(coords.first, coords.second)
-                val distStr = calcularDistanciaTexto(latitude, longitude, coords.first, coords.second)
+                val distResults = FloatArray(1)
+                Location.distanceBetween(latitude, longitude, coords.first, coords.second, distResults)
+                val metros = distResults[0]
+                val tiempoMin = (metros / 80).toInt().coerceAtLeast(1) // Estimación caminando (80m/min)
+                
+                val distStr = if (metros < 1000) "${metros.toInt()} m" else "${(metros/1000).toInt()}.${((metros/100)%10).toInt()} km"
                 
                 Marker(
                     state = MarkerState(position = stopLoc),
                     title = parada.nombre,
-                    snippet = "A $distStr de ti",
+                    snippet = "A $distStr - Aprox $tiempoMin min",
                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
                     onClick = {
                         onParadaSelected(parada)
-                        // Centrar la cámara suavemente en la parada al tocar el marcador
-                        cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(stopLoc, 16f))
+                        scope.launch {
+                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(stopLoc, 16f))
+                        }
                         false
                     }
                 )
@@ -82,38 +90,13 @@ actual fun MapComponent(
 private fun extraerCoordenadas(link: String?): Pair<Double, Double>? {
     if (link.isNullOrBlank()) return null
     try {
-        // Soporte para múltiples formatos de Google Maps:
-        // 1. @20.123,-98.456
-        // 2. q=20.123,-98.456
-        // 3. place/20.123,-98.456
+        // Regex robusto para capturar lat,lon en links de Google Maps
         val regex = Regex("([-+]?\\d+\\.\\d+),([-+]?\\d+\\.\\d+)")
         val matches = regex.findAll(link).toList()
-        
-        // Generalmente la ubicación exacta es la última que aparece en el link de destino
         if (matches.isNotEmpty()) {
             val lastMatch = matches.last()
-            val lat = lastMatch.groupValues[1].toDouble()
-            val lon = lastMatch.groupValues[2].toDouble()
-            
-            // Validación básica para evitar capturar el zoom (ej. 17z) si el regex fuera muy permisivo
-            if (lat in -90.0..90.0 && lon in -180.0..180.0) {
-                return Pair(lat, lon)
-            }
+            return Pair(lastMatch.groupValues[1].toDouble(), lastMatch.groupValues[2].toDouble())
         }
-    } catch (e: Exception) {
-        println("ERROR_MAP_COORDS: ${e.message}")
-    }
+    } catch (e: Exception) {}
     return null
-}
-
-private fun calcularDistanciaTexto(lat1: Double, lon1: Double, lat2: Double, lon2: Double): String {
-    val results = FloatArray(1)
-    Location.distanceBetween(lat1, lon1, lat2, lon2, results)
-    val metros = results[0]
-    return if (metros < 1000) {
-        "${metros.toInt()} metros"
-    } else {
-        val km = metros / 1000
-        "${km.toInt()}.${((km % 1) * 10).toInt()} km"
-    }
 }
