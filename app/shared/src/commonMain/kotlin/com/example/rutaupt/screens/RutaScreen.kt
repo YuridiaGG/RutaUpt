@@ -32,21 +32,18 @@ fun RutaScreen(
 ) {
     val vinoUpt = UPTColors.Vino
     
-    // Estado para la ubicación real del usuario
     var userLat by remember { mutableStateOf<Double?>(null) }
     var userLon by remember { mutableStateOf<Double?>(null) }
     var selectedParada by remember { mutableStateOf<Parada?>(initialParada) }
     
     val hasPermission = LocationBridge.hasPermission?.invoke() ?: false
 
-    // Obtener ubicación al iniciar
     LaunchedEffect(hasPermission) {
         if (hasPermission) {
             LocationBridge.getCurrentLocation?.invoke { lat, lon ->
                 userLat = lat
                 userLon = lon
             }
-            
             LocationBridge.onLocationUpdate = { lat, lon ->
                 userLat = lat
                 userLon = lon
@@ -62,10 +59,10 @@ fun RutaScreen(
         }
     }
 
-    // Usamos Box para que el mapa ocupe TODA la pantalla y los elementos floten encima
+    // DISEÑO DE PANTALLA COMPLETA: Mapa al fondo, UI encima
     Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
         
-        // 1. EL MAPA (Completo)
+        // 1. EL MAPA (Ocupa el 100%)
         if (userLat != null && userLon != null) {
             MapComponent(
                 modifier = Modifier.fillMaxSize(),
@@ -85,28 +82,32 @@ fun RutaScreen(
             }
         }
 
-        // 2. BUSCADOR Y BOTÓN VOLVER (Overlay superior)
-        Column(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(16.dp)) {
-            Row(
+        // 2. BUSCADOR SUPERIOR (Flotante con sombra)
+        Box(modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(16.dp)) {
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
-                    .shadow(8.dp, RoundedCornerShape(28.dp))
-                    .background(Color.White, RoundedCornerShape(28.dp))
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .shadow(12.dp, RoundedCornerShape(28.dp)),
+                color = Color.White,
+                shape = RoundedCornerShape(28.dp)
             ) {
-                IconButton(onClick = onVolver) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = vinoUpt)
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onVolver) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = vinoUpt)
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Paradas de la ruta UPT", color = Color.Gray, modifier = Modifier.weight(1f))
                 }
-                Spacer(Modifier.width(8.dp))
-                Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
-                Spacer(Modifier.width(12.dp))
-                Text("Explorar ruta...", color = Color.Gray, modifier = Modifier.weight(1f))
             }
         }
 
-        // 3. BOTÓN CENTRAR
+        // 3. BOTÓN CENTRAR (Flotante derecha)
         FloatingActionButton(
             onClick = { 
                 LocationBridge.getCurrentLocation?.invoke { lat, lon ->
@@ -119,15 +120,15 @@ fun RutaScreen(
             shape = CircleShape,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = if (selectedParada != null) 220.dp else 32.dp, end = 16.dp)
+                .padding(bottom = if (selectedParada != null) 200.dp else 32.dp, end = 16.dp)
                 .size(56.dp)
         ) {
             Icon(Icons.Default.MyLocation, contentDescription = "Centrar")
         }
 
-        // 4. TARJETA DE DETALLES (Overlay inferior)
+        // 4. TARJETA DE INFORMACIÓN (Flotante inferior)
         if (selectedParada != null) {
-            val distStr = if (userLat != null && userLon != null) {
+            val infoDistancia = if (userLat != null && userLon != null) {
                 calcularDistanciaKM(userLat!!, userLon!!, selectedParada!!.ubicacion)
             } else "Calculando..."
 
@@ -136,28 +137,29 @@ fun RutaScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .shadow(16.dp, RoundedCornerShape(24.dp)),
+                    .shadow(20.dp, RoundedCornerShape(24.dp)),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .background(vinoUpt.copy(alpha = 0.1f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = vinoUpt)
-                        }
-                        Spacer(Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(selectedParada!!.nombre, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
-                            Text("A $distStr de ti", color = vinoUpt, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
-                        }
-                        IconButton(onClick = { selectedParada = null }) {
-                            Icon(Icons.Default.Close, contentDescription = "Cerrar")
-                        }
+                Row(
+                    modifier = Modifier.padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .background(vinoUpt.copy(alpha = 0.1f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = vinoUpt)
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(selectedParada!!.nombre, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black)
+                        Text(infoDistancia, color = vinoUpt, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                    }
+                    IconButton(onClick = { selectedParada = null }) {
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar")
                     }
                 }
             }
@@ -174,7 +176,8 @@ private fun calcularDistanciaKM(lat1: Double, lon1: Double, link: String?): Stri
             val lat2 = match.groupValues[1].toDouble()
             val lon2 = match.groupValues[2].toDouble()
             
-            val r = 6371.0 // km
+            // Fórmula de Haversine
+            val r = 6371.0 // Radio Tierra km
             val dLat = (lat2 - lat1) * PI / 180.0
             val dLon = (lon2 - lon1) * PI / 180.0
             val a = sin(dLat / 2).pow(2.0) + cos(lat1 * PI / 180.0) * cos(lat2 * PI / 180.0) * sin(dLon / 2).pow(2.0)
@@ -182,16 +185,15 @@ private fun calcularDistanciaKM(lat1: Double, lon1: Double, link: String?): Stri
             val distancia = r * c
 
             return if (distancia < 1.0) {
-                "${(distancia * 1000).toInt()} metros"
+                val metros = (distancia * 1000).toInt()
+                val min = (metros / 80).toInt().coerceAtLeast(1)
+                "$metros m (aprox $min min)"
             } else {
-                "${distancia.format(1)} km"
+                val km = (distancia * 10).toInt() / 10.0
+                val min = (distancia * 12).toInt().coerceAtLeast(1)
+                "$km km (aprox $min min)"
             }
         }
     } catch (e: Exception) {}
-    return "Cerca"
-}
-
-private fun Double.format(digits: Int): String {
-    val factor = 10.0.pow(digits)
-    return ((this * factor).toInt() / factor).toString()
+    return "Cerca de ti"
 }

@@ -16,7 +16,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.*
 
@@ -25,7 +24,7 @@ class LocationService : Service() {
     private lateinit var locationProvider: LocationProvider
     private val apiService = RutaApiService()
     private val notifiedUnits = mutableSetOf<String>()
-    private val CHANNEL_ID = "ruta_upt_notifications"
+    private val CHANNEL_ID = "ruta_upt_proximity_v2"
 
     override fun onCreate() {
         super.onCreate()
@@ -40,10 +39,8 @@ class LocationService : Service() {
         serviceScope.launch {
             locationProvider.getUbicacionActual().collect { ubicacion ->
                 if (rol == "chofer" && unidadChofer.isNotEmpty()) {
-                    // Lógica para chofer: Actualizar ubicación en el servidor
                     apiService.actualizarUbicacion(unidadChofer, ubicacion.latitud, ubicacion.longitud)
                 } else if (rol == "estudiante") {
-                    // Lógica para estudiante: Verificar cercanía de unidades
                     verificarUnidadesCercanas(ubicacion)
                 }
             }
@@ -59,37 +56,36 @@ class LocationService : Service() {
                 unidad.latitud, unidad.longitud
             )
 
-            // Si está a menos de 500 metros (0.5 km)
-            if (distancia < 0.5) {
+            // Si está a menos de 400 metros
+            if (distancia < 0.4) {
                 if (!notifiedUnits.contains(unidad.unidad)) {
                     mostrarNotificacion(unidad.unidad)
                     notifiedUnits.add(unidad.unidad)
                 }
-            } else {
-                // Si se aleja, permitimos volver a notificar después
+            } else if (distancia > 0.8) {
+                // Se alejó lo suficiente para permitir una nueva notificación en el futuro
                 notifiedUnits.remove(unidad.unidad)
             }
         }
     }
 
     private fun calcularDistancia(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371 // Radio de la tierra en km
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(dLon / 2) * sin(dLon / 2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        val r = 6371.0 // Radio de la tierra en km
+        val dLat = (lat2 - lat1) * PI / 180.0
+        val dLon = (lon2 - lon1) * PI / 180.0
+        val a = sin(dLat / 2).pow(2.0) + cos(lat1 * PI / 180.0) * cos(lat2 * PI / 180.0) * sin(dLon / 2).pow(2.0)
+        val c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a))
         return r * c
     }
 
     private fun mostrarNotificacion(numeroUnidad: String) {
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // Deberías usar un icono de tu app
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle("Ruta UPT")
-            .setContentText("Unidad $numeroUnidad, esta cerca de ti. :)")
+            .setContentText("Unidad $numeroUnidad esta cerca de ti") // Texto exacto solicitado
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setAutoCancel(true)
 
         notificationManager.notify(numeroUnidad.hashCode(), builder.build())
@@ -98,10 +94,9 @@ class LocationService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Avisos de Proximidad"
-            val descriptionText = "Notificaciones cuando una unidad está cerca"
-            val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
-                description = descriptionText
+            val channel = NotificationChannel(CHANNEL_ID, name, NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Notificaciones cuando una unidad está cerca"
+                enableVibration(true)
             }
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)

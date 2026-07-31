@@ -138,8 +138,8 @@ fun App() {
             )
             "estudiante" -> HomeEstudianteScreen(
                 onNavigateToProfile = { pantallaActual = "perfil_estudiante" },
-                onNavigateToRuta = { 
-                    paradaSeleccionada = it
+                onNavigateToRuta = { parada ->
+                    paradaSeleccionada = parada
                     pantallaActual = "ruta" 
                 }
             )
