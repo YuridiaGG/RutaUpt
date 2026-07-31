@@ -5,6 +5,7 @@ import androidx.compose.runtime.*
 import com.example.rutaupt.screens.*
 import com.example.rutaupt.model.Chofer
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.api.Parada
 
 @Composable
 fun App() {
@@ -12,13 +13,13 @@ fun App() {
         mutableStateOf(if (SessionManager.rolUsuario.isNotEmpty()) SessionManager.rolUsuario.lowercase() else "login") 
     }
     var choferSeleccionado by remember { mutableStateOf<Chofer?>(null) }
+    var paradaSeleccionada by remember { mutableStateOf<Parada?>(null) }
     var adminMessage by remember { mutableStateOf<String?>(null) }
 
     // Manejo del botón atrás del sistema
     BackHandler(enabled = pantallaActual != "login") {
         when (pantallaActual) {
             "admin", "chofer", "estudiante" -> {
-                // Si está en el home de cualquier rol, vuelve al login (cerrar sesión)
                 pantallaActual = "login"
             }
             "lista_choferes", "gestionar_horarios", "lista_estudiantes", 
@@ -137,7 +138,10 @@ fun App() {
             )
             "estudiante" -> HomeEstudianteScreen(
                 onNavigateToProfile = { pantallaActual = "perfil_estudiante" },
-                onNavigateToRuta = { pantallaActual = "ruta" }
+                onNavigateToRuta = { 
+                    paradaSeleccionada = it
+                    pantallaActual = "ruta" 
+                }
             )
             "perfil_estudiante" -> PerfilEstudianteScreen(
                 onVolver = { pantallaActual = "estudiante" },
@@ -145,7 +149,11 @@ fun App() {
                 onSaveSuccess = { pantallaActual = "estudiante" }
             )
             "ruta" -> RutaScreen(
-                onVolver = { pantallaActual = "estudiante" }
+                initialParada = paradaSeleccionada,
+                onVolver = { 
+                    paradaSeleccionada = null
+                    pantallaActual = "estudiante" 
+                }
             )
         }
     }

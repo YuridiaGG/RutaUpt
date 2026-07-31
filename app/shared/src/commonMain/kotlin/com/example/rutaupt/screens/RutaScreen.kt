@@ -25,13 +25,16 @@ import com.example.rutaupt.api.Parada
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RutaScreen(onVolver: () -> Unit) {
+fun RutaScreen(
+    initialParada: Parada? = null,
+    onVolver: () -> Unit
+) {
     val vinoUpt = UPTColors.Vino
     
     // Estado para la ubicación real del usuario
     var userLat by remember { mutableStateOf<Double?>(null) }
     var userLon by remember { mutableStateOf<Double?>(null) }
-    var selectedParada by remember { mutableStateOf<Parada?>(null) }
+    var selectedParada by remember { mutableStateOf<Parada?>(initialParada) }
     
     val hasPermission = LocationBridge.hasPermission?.invoke() ?: false
 
@@ -44,10 +47,8 @@ fun RutaScreen(onVolver: () -> Unit) {
             }
             
             LocationBridge.onLocationUpdate = { lat, lon ->
-                if (userLat == null) {
-                    userLat = lat
-                    userLon = lon
-                }
+                userLat = lat
+                userLon = lon
             }
             LocationBridge.startLocationUpdates?.invoke()
         }
@@ -88,17 +89,21 @@ fun RutaScreen(onVolver: () -> Unit) {
                     modifier = Modifier.fillMaxSize(),
                     latitude = userLat!!,
                     longitude = userLon!!,
-                    title = "Mi Ubicación Exacta",
+                    title = "Mi Ubicación",
                     paradas = ParadaRepository.paradas,
                     onParadaSelected = { selectedParada = it }
                 )
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = vinoUpt)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(color = vinoUpt)
+                        Spacer(Modifier.height(16.dp))
+                        Text("Obteniendo ubicación exacta...", color = Color.Gray)
+                    }
                 }
             }
 
-            // --- BUSCADOR TIPO GOOGLE MAPS ---
+            // --- BUSCADOR ---
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -117,30 +122,26 @@ fun RutaScreen(onVolver: () -> Unit) {
                 }
             }
 
-            // --- BOTONES FLOTANTES DE MAPA ---
-            Column(
+            // --- BOTÓN CENTRAR ---
+            FloatingActionButton(
+                onClick = { 
+                    LocationBridge.getCurrentLocation?.invoke { lat, lon ->
+                        userLat = lat
+                        userLon = lon
+                    }
+                },
+                containerColor = Color.White,
+                contentColor = vinoUpt,
+                shape = CircleShape,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(bottom = if (selectedParada != null) 200.dp else 120.dp, end = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(bottom = if (selectedParada != null) 180.dp else 32.dp, end = 16.dp)
+                    .size(56.dp)
             ) {
-                FloatingActionButton(
-                    onClick = { 
-                        LocationBridge.getCurrentLocation?.invoke { lat, lon ->
-                            userLat = lat
-                            userLon = lon
-                        }
-                    },
-                    containerColor = Color.White,
-                    contentColor = vinoUpt,
-                    shape = CircleShape,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = "Centrar")
-                }
+                Icon(Icons.Default.MyLocation, contentDescription = "Centrar")
             }
 
-            // --- TARJETA DE DETALLES (Dinámica si hay parada seleccionada) ---
+            // --- TARJETA DE PARADA SELECCIONADA ---
             if (selectedParada != null) {
                 Card(
                     modifier = Modifier
@@ -149,38 +150,7 @@ fun RutaScreen(onVolver: () -> Unit) {
                         .padding(16.dp)
                         .shadow(16.dp, RoundedCornerShape(20.dp)),
                     shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f))
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(50.dp)
-                                    .background(vinoUpt.copy(alpha = 0.1f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.DirectionsBus, contentDescription = null, tint = vinoUpt)
-                            }
-                            Spacer(Modifier.width(16.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(selectedParada!!.nombre, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                                Text("Parada de la ruta", color = Color.Gray, fontSize = 14.sp)
-                            }
-                            IconButton(onClick = { selectedParada = null }) {
-                                Icon(Icons.Default.Close, contentDescription = "Cerrar")
-                            }
-                        }
-                    }
-                }
-            } else {
-                Card(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                        .shadow(16.dp, RoundedCornerShape(20.dp)),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.95f))
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
                 ) {
                     Row(
                         modifier = Modifier.padding(20.dp),
@@ -196,8 +166,11 @@ fun RutaScreen(onVolver: () -> Unit) {
                         }
                         Spacer(Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Unidad UPT-05", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text("En recorrido - Ubicación real", color = Color.Gray, fontSize = 14.sp)
+                            Text(selectedParada!!.nombre, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("Toca el marcador azul para ver distancia", color = vinoUpt, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        IconButton(onClick = { selectedParada = null }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cerrar")
                         }
                     }
                 }

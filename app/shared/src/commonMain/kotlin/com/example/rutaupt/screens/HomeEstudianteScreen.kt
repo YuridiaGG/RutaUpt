@@ -1,9 +1,7 @@
 package com.example.rutaupt.screens
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -40,6 +38,7 @@ import com.example.rutaupt.storage.SessionManager
 import com.example.rutaupt.storage.ParadaRepository
 import com.example.rutaupt.api.RutaApiService
 import com.example.rutaupt.api.UbicacionVehiculo
+import com.example.rutaupt.api.Parada
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
@@ -49,7 +48,7 @@ import kotlin.math.abs
 @Composable
 fun HomeEstudianteScreen(
     onNavigateToProfile: () -> Unit = {},
-    onNavigateToRuta: () -> Unit = {}
+    onNavigateToRuta: (Parada?) -> Unit = {}
 ) {
     val vinoUpt = UPTColors.Vino
     val vinoOscuro = UPTColors.VinoOscuro
@@ -57,7 +56,6 @@ fun HomeEstudianteScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     
-    // Verificación de permisos para el Estudiante
     var hasLocationPermission by remember { 
         mutableStateOf(LocationBridge.hasPermission?.invoke() ?: false) 
     }
@@ -74,7 +72,13 @@ fun HomeEstudianteScreen(
 
     var showNotifications by remember { mutableStateOf(false) }
     var lastSeenNotificationCount by remember { mutableStateOf(0) }
-    val currentNotificationCount = ReporteRepository.reportes.size
+    
+    // FILTRO: Solo avisos que interesan al estudiante (otros estudiantes o estados de unidad)
+    val avisosEstudiante = ReporteRepository.reportes.filter { 
+        it.mensaje.startsWith("Anónimo:") || it.estado == "Unidad llena" || it.estado == "Disponible"
+    }
+    
+    val currentNotificationCount = avisosEstudiante.size
     val hasNewNotifications = currentNotificationCount > lastSeenNotificationCount
 
     Scaffold(
@@ -118,22 +122,12 @@ fun HomeEstudianteScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text("Avisos Recientes", fontWeight = FontWeight.Bold)
-                                if (ReporteRepository.reportes.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = { ReporteRepository.limpiarReportes() },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(Icons.Default.DeleteSweep, contentDescription = "Limpiar todo", tint = Color.Gray)
-                                    }
-                                }
                             }
                             HorizontalDivider()
-                            if (ReporteRepository.reportes.isEmpty()) {
+                            if (avisosEstudiante.isEmpty()) {
                                 Text("No hay avisos nuevos", modifier = Modifier.padding(16.dp), color = Color.Gray)
                             } else {
-                                ReporteRepository.reportes.filter { 
-                                    it.estado == "Unidad llena" || it.estado == "Disponible" 
-                                }.take(5).forEach { reporte ->
+                                avisosEstudiante.take(5).forEach { reporte ->
                                     DropdownMenuItem(
                                         text = { 
                                             Column {
@@ -141,17 +135,7 @@ fun HomeEstudianteScreen(
                                                 Text(reporte.tiempo, fontSize = 10.sp, color = Color.Gray)
                                             }
                                         },
-                                        onClick = { showNotifications = false },
-                                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null, tint = vinoUpt) },
-                                        trailingIcon = {
-                                            IconButton(onClick = { 
-                                                scope.launch {
-                                                    ReporteRepository.eliminarReporte(reporte.id)
-                                                }
-                                            }) {
-                                                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.LightGray, modifier = Modifier.size(18.dp))
-                                            }
-                                        }
+                                        onClick = { showNotifications = false }
                                     )
                                 }
                             }
@@ -216,7 +200,7 @@ fun HomeEstudianteScreen(
                             }
                         }
                     }
-                    "Avisos" -> AvisosSection(vinoUpt, scope)
+                    "Avisos" -> AvisosSection(vinoUpt)
                 }
             }
         }
@@ -224,18 +208,14 @@ fun HomeEstudianteScreen(
 }
 
 @Composable
-fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onNavigateToRuta: () -> Unit, onSendReport: (String) -> Unit) {
+fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onNavigateToRuta: (Parada?) -> Unit, onSendReport: (String) -> Unit) {
     val trackingService = remember { TrackingService() }
     val apiService = remember { RutaApiService() }
     
-    // 1. UBICACIÓN REAL DEL ESTUDIANTE
     var currentUserLat by remember { mutableStateOf<Double?>(null) }
     var currentUserLon by remember { mutableStateOf<Double?>(null) }
-
-    // 2. UBICACIONES REALES DE LAS MICROS (DESDE LA BD)
     val unidadesReales = remember { mutableStateListOf<UbicacionVehiculo>() }
 
-    // 3. ACTIVAR GPS DEL ESTUDIANTE
     DisposableEffect(hasPermission) {
         if (hasPermission) {
             LocationBridge.getCurrentLocation?.invoke { lat, lon ->
@@ -257,7 +237,6 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
     var tiempoEstimado by remember { mutableStateOf(0) }
     var lastNotifiedUnidad by remember { mutableStateOf("") }
 
-    // 4. POLLING DE UBICACIONES DESDE EL SERVIDOR CADA 10 SEGUNDOS
     LaunchedEffect(Unit) {
         while(true) {
             val lista = apiService.obtenerUbicaciones()
@@ -267,7 +246,6 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
         }
     }
 
-    // 5. CALCULAR PROXIMIDAD REAL
     LaunchedEffect(currentUserLat, currentUserLon, unidadesReales.size) {
         val lat = currentUserLat ?: return@LaunchedEffect
         val lon = currentUserLon ?: return@LaunchedEffect
@@ -282,7 +260,7 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
             )
 
             if (tiempoEstimado <= 5 && lastNotifiedUnidad != masCercana.unidad) {
-                getPlatform().showNotification("Unidad Cerca", "La Unidad ${masCercana.unidad} está cerca de ti")
+                getPlatform().showNotification("Unidad Cerca", "La Unidad ${masCercana.unidad}, esta cerca de ti")
                 lastNotifiedUnidad = masCercana.unidad
             } else if (tiempoEstimado > 10) {
                 lastNotifiedUnidad = ""
@@ -329,7 +307,6 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
         }
 
         Column(modifier = Modifier.padding(16.dp)) {
-            // TARJETA REAL DE PROXIMIDAD
             unidadMasCercana?.let { unidad ->
                 if (tiempoEstimado <= 15) {
                     SectionTitle("Micro cerca de ti")
@@ -366,7 +343,7 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
                     .fillMaxWidth()
                     .height(250.dp)
                     .padding(vertical = 8.dp)
-                    .clickable { onNavigateToRuta() },
+                    .clickable { onNavigateToRuta(null) },
                 shape = RoundedCornerShape(16.dp),
                 elevation = CardDefaults.cardElevation(4.dp)
             ) {
@@ -393,17 +370,9 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
                                 Text("Ubicación en tiempo real", fontSize = 12.sp, fontWeight = FontWeight.Medium)
                             }
                         }
-                    } else if (!hasPermission) {
-                        Box(modifier = Modifier.fillMaxSize().background(Color.LightGray), contentAlignment = Alignment.Center) {
-                            Text("Se requiere permiso de ubicación", color = Color.DarkGray)
-                        }
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                CircularProgressIndicator(color = vinoUpt)
-                                Spacer(Modifier.height(16.dp))
-                                Text("Obteniendo tu ubicación...", color = Color.Gray)
-                            }
+                            CircularProgressIndicator(color = vinoUpt)
                         }
                     }
                 }
@@ -413,12 +382,13 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
             Card(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White)
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(2.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     val paradas = ParadaRepository.paradas
                     if (paradas.isEmpty()) {
-                        Text("No hay paradas registradas", color = Color.Gray, fontSize = 14.sp)
+                        Text("No hay paradas registradas", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
                     } else {
                         paradas.forEachIndexed { index, parada ->
                             StopItem(
@@ -428,7 +398,7 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
                                 isLast = index == paradas.size - 1,
                                 color = if (index == 0) Color.Red else if (index == paradas.size - 1) Color.Black else Color.Gray,
                                 onClick = {
-                                    parada.ubicacion?.let { getPlatform().openUrl(it) }
+                                    onNavigateToRuta(parada)
                                 }
                             )
                         }
@@ -456,10 +426,11 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
             }
 
             SectionTitle("Avisos de otros estudiantes")
-            if (ReporteRepository.reportes.isEmpty()) {
+            val avisosOtros = ReporteRepository.reportes.filter { it.mensaje.startsWith("Anónimo:") }
+            if (avisosOtros.isEmpty()) {
                 Text("No hay avisos recientes", modifier = Modifier.padding(8.dp), color = Color.Gray)
             } else {
-                ReporteRepository.reportes.take(3).forEach { reporte ->
+                avisosOtros.take(3).forEach { reporte ->
                     RecentReportItem(reporte.mensaje, reporte.tiempo, Icons.Default.Info, if(reporte.tipo == ReporteTipo.ALERTA) Color.Red else vinoUpt)
                 }
             }
@@ -470,21 +441,23 @@ fun InicioSection(vinoUpt: Color, vinoOscuro: Color, hasPermission: Boolean, onN
 }
 
 @Composable
-fun AvisosSection(vinoUpt: Color, scope: kotlinx.coroutines.CoroutineScope) {
+fun AvisosSection(vinoUpt: Color) {
+    val avisosEstudiantes = ReporteRepository.reportes.filter { it.mensaje.startsWith("Anónimo:") }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Avisos de Estudiantes", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = vinoUpt)
         Spacer(modifier = Modifier.height(16.dp))
         
-        if (ReporteRepository.reportes.isEmpty()) {
+        if (avisosEstudiantes.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.NotificationsNone, null, modifier = Modifier.size(48.dp), tint = Color.LightGray)
-                    Text("No hay avisos recientes", color = Color.Gray)
+                    Text("No hay avisos de otros estudiantes", color = Color.Gray)
                 }
             }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(ReporteRepository.reportes) { reporte ->
+                items(avisosEstudiantes) { reporte ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
@@ -502,13 +475,6 @@ fun AvisosSection(vinoUpt: Color, scope: kotlinx.coroutines.CoroutineScope) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(reporte.mensaje, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Text(reporte.tiempo, fontSize = 12.sp, color = Color.Gray)
-                            }
-                            IconButton(onClick = { 
-                                scope.launch {
-                                    ReporteRepository.eliminarReporte(reporte.id)
-                                }
-                            }) {
-                                Icon(Icons.Default.Close, null, tint = Color.LightGray, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -531,18 +497,34 @@ fun SectionTitle(title: String) {
 
 @Composable
 fun StopItem(name: String, time: String, isFirst: Boolean = false, isLast: Boolean = false, color: Color = Color.Gray, onClick: () -> Unit = {}) {
-    Row(modifier = Modifier.fillMaxWidth().height(50.dp).clickable { onClick() }, verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.width(24.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp), 
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.width(32.dp).heightIn(min = 64.dp), contentAlignment = Alignment.Center) {
             if (!isFirst) Box(modifier = Modifier.width(2.dp).fillMaxHeight(0.5f).align(Alignment.TopCenter).background(Color.LightGray))
             if (!isLast) Box(modifier = Modifier.width(2.dp).fillMaxHeight(0.5f).align(Alignment.BottomCenter).background(Color.LightGray))
             
-            Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.White).padding(2.dp)) {
-                Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(color))
+            Box(modifier = Modifier.size(14.dp).background(Color.White, CircleShape).border(1.dp, Color.LightGray, CircleShape).padding(2.dp)) {
+                Box(modifier = Modifier.fillMaxSize().background(color, CircleShape))
             }
         }
-        Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-            Text(name, fontSize = 14.sp, fontWeight = if(isFirst || isLast) FontWeight.Bold else FontWeight.Normal)
-            Text("Toca para ver ubicación", fontSize = 10.sp, color = Color.Blue.copy(alpha = 0.6f))
+        Column(modifier = Modifier.weight(1f).padding(start = 12.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)) {
+            Text(
+                text = name, 
+                fontSize = 16.sp, 
+                fontWeight = if(isFirst || isLast) FontWeight.Bold else FontWeight.Medium,
+                color = Color.Black
+            )
+            Text(
+                text = "Ver en mapa", 
+                fontSize = 12.sp, 
+                color = Color(0xFF2196F3),
+                fontWeight = FontWeight.Bold
+            )
         }
         Text(time, fontSize = 12.sp, color = Color.Gray)
     }
@@ -577,7 +559,7 @@ fun RecentReportItem(title: String, time: String, icon: ImageVector, iconColor: 
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 Text(time, fontSize = 12.sp, color = Color.Gray)
