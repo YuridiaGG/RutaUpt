@@ -35,10 +35,17 @@ class RutaApiService {
 
     companion object {
         private const val BASE_URL = "https://rutaupt-production.up.railway.app"
+
+        // Mismos patrones que LocationUtils.extraerCoordenadas, para saber
+        // si un link YA trae coordenadas visibles (y así no gastar una
+        // llamada de red resolviéndolo de nuevo).
+        private val REGEX_COMMA = Regex("([-+]?\\d+\\.\\d+),\\s*([-+]?\\d+\\.\\d+)")
+        private val REGEX_GOOGLE_INTERNAL = Regex("!3d([-+]?\\d+\\.\\d+)!4d([-+]?\\d+\\.\\d+)")
+        private val REGEX_AT = Regex("@([-+]?\\d+\\.\\d+),([-+]?\\d+\\.\\d+)")
     }
 
     private val client = HttpClient {
-        expectSuccess = false 
+        expectSuccess = false
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -89,15 +96,45 @@ class RutaApiService {
         }
     }
 
-    suspend fun agregarParada(nombre: String, ubicacion: String? = null): Boolean {
+    /**
+     * Devuelve la Parada tal como quedó guardada (con el link ya resuelto/expandido),
+     * o null si falló. Se regresa el objeto completo -no solo Boolean- para que quien
+     * llame (ParadaRepository) pueda usar el link ya resuelto en su copia local,
+     * en vez del link corto original que escribió el admin.
+     */
+    suspend fun agregarParada(nombre: String, ubicacion: String? = null): Parada? {
         return try {
+            val ubicacionFinal = ubicacion?.let { resolverLinkUbicacion(it) }
+            val nuevaParada = Parada(nombre = nombre, ubicacion = ubicacionFinal)
             val response = client.post("$BASE_URL/api/paradas") {
                 contentType(ContentType.Application.Json)
-                setBody(Parada(nombre = nombre, ubicacion = ubicacion))
+                setBody(nuevaParada)
             }
-            response.status.isSuccess()
+            if (response.status.isSuccess()) nuevaParada else null
         } catch (e: Exception) {
-            false
+            null
+        }
+    }
+
+    /**
+     * Si el link ya trae coordenadas visibles (formato largo), lo regresa tal cual.
+     * Si es un link corto (maps.app.goo.gl, goo.gl/maps, etc.) sin coordenadas en
+     * el texto, sigue la redirección UNA VEZ y guarda la URL final ya expandida,
+     * para que LocationUtils.extraerCoordenadas pueda leer las coordenadas después
+     * sin tener que volver a resolver el link cada vez que se dibuja el mapa.
+     */
+    private suspend fun resolverLinkUbicacion(link: String): String {
+        val yaTieneCoordenadas = REGEX_COMMA.containsMatchIn(link) ||
+                REGEX_GOOGLE_INTERNAL.containsMatchIn(link) ||
+                REGEX_AT.containsMatchIn(link)
+        if (yaTieneCoordenadas) return link
+
+        return try {
+            val response = client.get(link)
+            val urlFinal = response.call.request.url.toString()
+            urlFinal.ifBlank { link }
+        } catch (e: Exception) {
+            link
         }
     }
 

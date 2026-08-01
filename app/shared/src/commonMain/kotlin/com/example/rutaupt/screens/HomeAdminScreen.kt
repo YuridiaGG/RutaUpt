@@ -58,7 +58,7 @@ fun HomeAdminScreen(
     val vinoOscuro = UPTColors.VinoOscuro
     val apiService = remember { RutaApiService() }
     val scope = rememberCoroutineScope()
-    
+
     var stats by remember { mutableStateOf(mapOf("estudiantes" to 0, "choferes" to 0, "rutas" to 0)) }
     var showMenu by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
@@ -71,7 +71,7 @@ fun HomeAdminScreen(
         scope.launch { ChoferRepository.cargarDesdeServidor() }
         scope.launch { EstudianteRepository.cargarDesdeServidor() }
         scope.launch { ParadaRepository.cargarParadas() }
-        
+
         while(true) {
             stats = apiService.obtenerEstadisticasAdmin()
             ReporteRepository.cargarReportes()
@@ -79,8 +79,8 @@ fun HomeAdminScreen(
         }
     }
 
-    val notificacionesAdmin = ReporteRepository.reportes.filter { 
-        it.estado != null && it.estado!!.startsWith("EstadoChofer_") 
+    val notificacionesAdmin = ReporteRepository.reportes.filter {
+        it.estado != null && it.estado!!.startsWith("EstadoChofer_")
     }
     val unreadCount = (notificacionesAdmin.size - lastSeenCount).coerceAtLeast(0)
 
@@ -90,8 +90,8 @@ fun HomeAdminScreen(
                 title = { Text("Administrador", color = Color.White, fontWeight = FontWeight.Bold) },
                 actions = {
                     Box {
-                        IconButton(onClick = { 
-                            showNotifications = true 
+                        IconButton(onClick = {
+                            showNotifications = true
                             lastSeenCount = notificacionesAdmin.size // Marcar como leídas
                         }) {
                             BadgedBox(
@@ -127,8 +127,32 @@ fun HomeAdminScreen(
                             }
                         }
                     }
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.Settings, null, tint = Color.White)
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.Settings, null, tint = Color.White)
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            modifier = Modifier.background(Color.White)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Perfil") },
+                                leadingIcon = { Icon(Icons.Default.Person, null, tint = vinoUpt) },
+                                onClick = {
+                                    showMenu = false
+                                    onConfiguracion()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Cerrar sesión") },
+                                leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = Color.Red) },
+                                onClick = {
+                                    showMenu = false
+                                    onLogout()
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = vinoUpt)

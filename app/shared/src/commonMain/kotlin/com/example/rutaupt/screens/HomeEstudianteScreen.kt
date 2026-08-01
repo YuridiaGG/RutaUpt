@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -130,8 +131,8 @@ fun HomeEstudianteScreen(
                 val pLat = lastLat
                 val pLon = lastLon
                 if (pLat != null && pLon != null) {
-                    val d = LocationUtils.calcularDistanciaMetros(pLat, pLon, lat, lon)
-                    isUserMoving = d > 1.2 
+                    val dist = LocationUtils.calcularDistanciaMetros(pLat, pLon, lat, lon)
+                    isUserMoving = dist > 1.2 
                 }
                 currentUserLat = lat
                 currentUserLon = lon 
@@ -273,11 +274,11 @@ fun InicioSection(
             SectionTitle("Mi ruta")
             
             val microParaMostrar = nearbyUnit ?: UbicacionVehiculo("12", 20.14, -98.32, 0L)
-            val currentLat = currentUserLat ?: LocationUtils.DEFAULT_LAT
-            val currentLon = currentUserLon ?: LocationUtils.DEFAULT_LON
+            val curLat = currentUserLat ?: LocationUtils.DEFAULT_LAT
+            val curLon = currentUserLon ?: LocationUtils.DEFAULT_LON
             
             val dist = if (nearbyUnit != null) {
-                LocationUtils.calcularDistanciaMetros(currentLat, currentLon, nearbyUnit.latitud, nearbyUnit.longitud)
+                LocationUtils.calcularDistanciaMetros(curLat, curLon, nearbyUnit.latitud, nearbyUnit.longitud)
             } else 97600.0
 
             NearbyUnitCard(
@@ -299,8 +300,8 @@ fun InicioSection(
                 Box(modifier = Modifier.fillMaxSize()) {
                     MapComponent(
                         modifier = Modifier.fillMaxSize(),
-                        latitude = currentLat,
-                        longitude = currentLon,
+                        latitude = curLat,
+                        longitude = curLon,
                         title = "Mi Ubicación",
                         paradas = ParadaRepository.paradas
                     )
@@ -317,23 +318,27 @@ fun InicioSection(
                         paradas.forEachIndexed { index, parada ->
                             val reportePaso = ReporteRepository.reportes.find { it.estado == "ParadaPasada_${parada.nombre}" }
                             
-                            // Lógica de distancia en km basada en el link (ubicación)
+                            // Lógica de distancia en km basada en el link de Google Maps
                             val coordsParada = LocationUtils.extraerCoordenadas(parada.ubicacion)
-                            val sLat = currentUserLat
-                            val sLon = currentUserLon
-                            val distTexto = if (coordsParada != null && sLat != null && sLon != null) {
-                                val m = LocationUtils.calcularDistanciaMetros(sLat, sLon, coordsParada.first, coordsParada.second)
-                                val km = m / 1000.0
-                                " • ${((km * 10).toInt() / 10.0)} km"
+                            val studentLat = currentUserLat
+                            val studentLon = currentUserLon
+                            val infoUbicacion = if (coordsParada != null) {
+                                val distPart = if (studentLat != null && studentLon != null) {
+                                    val m = LocationUtils.calcularDistanciaMetros(studentLat, studentLon, coordsParada.first, coordsParada.second)
+                                    val km = m / 1000.0
+                                    val formattedKm = (km * 10).toInt() / 10.0
+                                    " a $formattedKm km"
+                                } else ""
+                                " • Ubicación$distPart"
                             } else ""
 
                             StopItem(
                                 name = parada.nombre,
-                                status = (if (reportePaso != null) "Ya pasó Unidad ${reportePaso.unidad}" else "En espera") + distTexto,
+                                status = (if (reportePaso != null) "Ya pasó Unidad ${reportePaso.unidad}" else "En espera") + infoUbicacion,
                                 isFirst = index == 0,
                                 isLast = index == paradas.size - 1,
                                 color = if (reportePaso != null) Color(0xFF2E7D32) else Color.Gray,
-                                onClick = { onNavigateToRuta(parada) }
+                                onClick = { onNavigateToRuta(parada) } // Al picar visualiza la ubicación en el mapa
                             )
                         }
                     }

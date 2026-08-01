@@ -20,13 +20,16 @@ object ParadaRepository {
 
     suspend fun agregarParada(nombre: String, ubicacion: String? = null): Boolean {
         if (nombre.isNotBlank()) {
-            val nuevaParada = Parada(nombre = nombre, ubicacion = ubicacion)
             return try {
-                val success = apiService.agregarParada(nombre, ubicacion)
-                if (success) {
-                    paradas.add(nuevaParada)
+                // apiService.agregarParada ya resuelve internamente los links cortos
+                // de Google Maps y regresa la Parada con el link final/expandido.
+                val paradaGuardada = apiService.agregarParada(nombre, ubicacion)
+                if (paradaGuardada != null) {
+                    paradas.add(paradaGuardada)
+                    true
+                } else {
+                    false
                 }
-                success
             } catch (e: Exception) {
                 false
             }
@@ -45,7 +48,7 @@ object ParadaRepository {
             false
         }
     }
-    
+
     fun limpiarParadas() {
         paradas.clear()
     }

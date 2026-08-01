@@ -36,6 +36,7 @@ import com.example.rutaupt.storage.ParadaRepository
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,10 +49,10 @@ fun HomeChoferScreen(
     val vinoOscuro = UPTColors.VinoOscuro
     val fondoGris = Color(0xFFF8F9FA)
     val scope = rememberCoroutineScope()
-    
+
     var selectedTab by remember { mutableStateOf("Inicio") }
     var showNotifications by remember { mutableStateOf(false) }
-    
+
     // Lógica de notificaciones leídas
     var lastSeenCount by remember { mutableStateOf(0) }
 
@@ -65,8 +66,8 @@ fun HomeChoferScreen(
 
     val notificacionesChofer = ReporteRepository.reportes.filter { reporte ->
         reporte.unidad == SessionManager.numeroUnidad && (
-            reporte.estado == "HorarioAsignado" || reporte.validacionAdmin != null
-        )
+                reporte.estado == "HorarioAsignado" || reporte.validacionAdmin != null
+                )
     }
     val unreadCount = (notificacionesChofer.size - lastSeenCount).coerceAtLeast(0)
 
@@ -76,8 +77,8 @@ fun HomeChoferScreen(
                 title = { Text("Chofer", color = Color.White, fontWeight = FontWeight.Bold) },
                 actions = {
                     Box {
-                        IconButton(onClick = { 
-                            showNotifications = true 
+                        IconButton(onClick = {
+                            showNotifications = true
                             lastSeenCount = notificacionesChofer.size // Marcar como leídas
                         }) {
                             BadgedBox(
@@ -98,7 +99,7 @@ fun HomeChoferScreen(
                             } else {
                                 notificacionesChofer.take(10).forEach { reporte ->
                                     DropdownMenuItem(
-                                        text = { 
+                                        text = {
                                             Column {
                                                 Text(reporte.mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                 Text(reporte.tiempo, fontSize = 10.sp, color = Color.Gray)
@@ -114,8 +115,8 @@ fun HomeChoferScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = vinoUpt)
             )
         },
-        bottomBar = { 
-            ChoferBottomNavigation(vinoUpt, selectedTab, { selectedTab = it }, onVerReportes, onConfiguracion) 
+        bottomBar = {
+            ChoferBottomNavigation(vinoUpt, selectedTab, { selectedTab = it }, onVerReportes, onConfiguracion)
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).background(fondoGris)) {
@@ -159,6 +160,9 @@ fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color) {
                 }
             }
 
+            // --- SECCIÓN: ESTADO ACTUAL ---
+            ChoferStatusSection(vinoUpt, scope)
+
             Text("Marcar paso por parada", fontWeight = FontWeight.Bold, fontSize = 19.sp, modifier = Modifier.padding(bottom = 12.dp))
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -169,9 +173,9 @@ fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color) {
                         paradas.forEachIndexed { index, parada ->
                             var isPassed by remember { mutableStateOf(false) }
                             ChoferStopItem(
-                                name = parada.nombre, 
-                                time = if (isPassed) "Completada" else "--:--", 
-                                active = isPassed, 
+                                name = parada.nombre,
+                                time = if (isPassed) "Completada" else "--:--",
+                                active = isPassed,
                                 isFirst = index == 0,
                                 isLast = index == paradas.size - 1,
                                 onPassed = {
@@ -194,6 +198,133 @@ fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color) {
                 }
             }
             Spacer(Modifier.height(30.dp))
+        }
+    }
+}
+
+@Composable
+fun ChoferStatusSection(vinoUpt: Color, scope: CoroutineScope) {
+    var currentStatus by remember { mutableStateOf("En recorrido") }
+
+    Column(modifier = Modifier.padding(bottom = 24.dp)) {
+        Text("Estado actual", fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(bottom = 12.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth().height(70.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = if (currentStatus == "En recorrido") Color(0xFFD32F2F) else Color(0xFFF57C00))
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.DirectionsBus, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(12.dp))
+                Text(currentStatus, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatusGridButton("Retrasada", Icons.Default.PhotoCamera, Color(0xFFF57C00), Modifier.weight(1f)) {
+                CameraBridge.onLaunchCamera?.invoke { base64 ->
+                    scope.launch {
+                        ReporteRepository.agregarReporte(
+                            ReporteUnidad(
+                                unidad = SessionManager.numeroUnidad,
+                                mensaje = "Unidad con retraso reportado por chofer",
+                                tiempo = "Justo ahora",
+                                tipo = ReporteTipo.ALERTA,
+                                imagen = base64,
+                                estado = "Retrasada"
+                            )
+                        )
+                        currentStatus = "Retrasada"
+                    }
+                }
+            }
+            StatusGridButton("Unidad llena", Icons.Default.Groups, Color(0xFFF57C00), Modifier.weight(1f)) {
+                scope.launch {
+                    ReporteRepository.agregarReporte(
+                        ReporteUnidad(
+                            unidad = SessionManager.numeroUnidad,
+                            mensaje = "Unidad llena reportada por chofer",
+                            tiempo = "Justo ahora",
+                            tipo = ReporteTipo.INFORMACION,
+                            estado = "Unidad llena"
+                        )
+                    )
+                    currentStatus = "Unidad llena"
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            StatusGridButton("Disponible", Icons.Default.CheckCircle, Color(0xFF2E7D32), Modifier.weight(1f)) {
+                scope.launch {
+                    ReporteRepository.agregarReporte(
+                        ReporteUnidad(
+                            unidad = SessionManager.numeroUnidad,
+                            mensaje = "Unidad disponible reportada por chofer",
+                            tiempo = "Justo ahora",
+                            tipo = ReporteTipo.INFORMACION,
+                            estado = "Disponible"
+                        )
+                    )
+                    currentStatus = "En recorrido"
+                }
+            }
+            StatusGridButton("Fin de ruta", Icons.Default.Flag, Color(0xFF757575), Modifier.weight(1f)) {
+                scope.launch {
+                    ReporteRepository.agregarReporte(
+                        ReporteUnidad(
+                            unidad = SessionManager.numeroUnidad,
+                            mensaje = "Ruta finalizada por chofer",
+                            tiempo = "Justo ahora",
+                            tipo = ReporteTipo.INFORMACION,
+                            estado = "Finalizado"
+                        )
+                    )
+                    currentStatus = "Finalizado"
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        StatusGridButton("En recorrido", Icons.Default.DirectionsBus, Color(0xFFD32F2F), Modifier.fillMaxWidth()) {
+            scope.launch {
+                ReporteRepository.agregarReporte(
+                    ReporteUnidad(
+                        unidad = SessionManager.numeroUnidad,
+                        mensaje = "Unidad en recorrido reportada por chofer",
+                        tiempo = "Justo ahora",
+                        tipo = ReporteTipo.INFORMACION,
+                        estado = "En recorrido"
+                    )
+                )
+                currentStatus = "En recorrido"
+            }
+        }
+    }
+}
+
+@Composable
+fun StatusGridButton(text: String, icon: ImageVector, iconColor: Color, modifier: Modifier, onClick: () -> Unit) {
+    Card(
+        modifier = modifier.height(90.dp).clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(icon, null, tint = iconColor, modifier = Modifier.size(30.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(text, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color.DarkGray)
         }
     }
 }
@@ -238,10 +369,38 @@ fun ChoferStopItem(name: String, time: String, active: Boolean, isFirst: Boolean
 
 @Composable
 fun ChoferBottomNavigation(vinoUpt: Color, selectedTab: String, onTabSelected: (String) -> Unit, onVerReportes: () -> Unit, onPerfil: () -> Unit) {
-    NavigationBar(containerColor = Color.White, modifier = Modifier.shadow(16.dp).height(80.dp)) {
-        NavigationBarItem(icon = { Icon(Icons.Default.Home, null) }, label = { Text("Inicio") }, selected = selectedTab == "Inicio", onClick = { onTabSelected("Inicio") })
-        NavigationBarItem(icon = { Icon(Icons.Default.Map, null) }, label = { Text("Mapa") }, selected = selectedTab == "Mapa", onClick = { onTabSelected("Mapa") })
-        NavigationBarItem(icon = { Icon(Icons.Default.Notifications, null) }, label = { Text("Avisos") }, selected = false, onClick = onVerReportes)
-        NavigationBarItem(icon = { Icon(Icons.Default.Person, null) }, label = { Text("Perfil") }, selected = false, onClick = onPerfil)
+    NavigationBar(
+        containerColor = Color.White,
+        modifier = Modifier.shadow(16.dp),
+        tonalElevation = 8.dp
+    ) {
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Home, null) },
+            label = { Text("Inicio") },
+            selected = selectedTab == "Inicio",
+            onClick = { onTabSelected("Inicio") },
+            colors = NavigationBarItemDefaults.colors(selectedIconColor = vinoUpt, indicatorColor = vinoUpt.copy(alpha = 0.1f))
+        )
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Map, null) },
+            label = { Text("Mapa") },
+            selected = selectedTab == "Mapa",
+            onClick = { onTabSelected("Mapa") },
+            colors = NavigationBarItemDefaults.colors(selectedIconColor = vinoUpt, indicatorColor = vinoUpt.copy(alpha = 0.1f))
+        )
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Notifications, null) },
+            label = { Text("Avisos") },
+            selected = false,
+            onClick = onVerReportes,
+            colors = NavigationBarItemDefaults.colors(selectedIconColor = vinoUpt, indicatorColor = vinoUpt.copy(alpha = 0.1f))
+        )
+        NavigationBarItem(
+            icon = { Icon(Icons.Default.Person, null) },
+            label = { Text("Perfil") },
+            selected = false,
+            onClick = onPerfil,
+            colors = NavigationBarItemDefaults.colors(selectedIconColor = vinoUpt, indicatorColor = vinoUpt.copy(alpha = 0.1f))
+        )
     }
 }
