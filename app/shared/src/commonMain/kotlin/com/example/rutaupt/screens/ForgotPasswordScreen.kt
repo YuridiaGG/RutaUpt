@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,23 +18,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.rutaupt.generated.resources.Res
 import com.example.rutaupt.generated.resources.imagentoro
-import com.example.rutaupt.getPlatform
 import com.example.rutaupt.api.AuthApiService
+import com.example.rutaupt.storage.SessionManager
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ForgotPasswordScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onLoginSuccess: (String) -> Unit
 ) {
     var email by remember { mutableStateOf("") }
-    var confirmEmail by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var step by remember { mutableStateOf(1) } // 1: Email, 2: Code
     var isLoading by remember { mutableStateOf(false) }
     
     val vinoUpt = UPTColors.Vino
@@ -43,9 +48,9 @@ fun ForgotPasswordScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Recuperación", fontWeight = FontWeight.Bold) },
+                title = { Text(if (step == 1) "Recuperación" else "Verificar Código", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack, enabled = !isLoading) {
+                    IconButton(onClick = { if (step == 2) step = 1 else onBack() }, enabled = !isLoading) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
@@ -69,7 +74,7 @@ fun ForgotPasswordScreen(
             Image(
                 painter = painterResource(Res.drawable.imagentoro),
                 contentDescription = "Toro UPT",
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(180.dp),
                 contentScale = ContentScale.FillWidth
             )
 
@@ -82,7 +87,7 @@ fun ForgotPasswordScreen(
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
                 Text(
-                    "Recuperación de contraseña",
+                    text = if (step == 1) "Recuperación de cuenta" else "Introduce el código",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = vinoUpt,
@@ -91,71 +96,91 @@ fun ForgotPasswordScreen(
                 )
 
                 Text(
-                    "Ingresa tu correo institucional. Te enviaremos tus credenciales de acceso registradas en el sistema.",
+                    text = if (step == 1) 
+                        "Ingresa tu correo institucional. Te enviaremos un código de 6 dígitos para acceder directamente."
+                    else 
+                        "Hemos enviado un código a $email. Por favor, introdúcelo para entrar a tu perfil.",
                     fontSize = 14.sp,
                     color = Color.Gray,
                     lineHeight = 20.sp,
                     textAlign = TextAlign.Center
                 )
 
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Correo electrónico") },
-                    placeholder = { Text("usuario@upt.edu.mx") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = vinoUpt) },
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true,
-                    enabled = !isLoading,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = vinoUpt,
-                        focusedLabelColor = vinoUpt,
-                        cursorColor = vinoUpt
+                if (step == 1) {
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Correo electrónico") },
+                        placeholder = { Text("usuario@upt.edu.mx") },
+                        leadingIcon = { Icon(Icons.Default.Email, null, tint = vinoUpt) },
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        enabled = !isLoading,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
                     )
-                )
-
-                OutlinedTextField(
-                    value = confirmEmail,
-                    onValueChange = { confirmEmail = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Confirmar correo") },
-                    placeholder = { Text("Repite tu correo") },
-                    leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = vinoUpt) },
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true,
-                    enabled = !isLoading,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = vinoUpt,
-                        focusedLabelColor = vinoUpt,
-                        cursorColor = vinoUpt
+                } else {
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = { if (it.length <= 6) code = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Código de 6 dígitos") },
+                        placeholder = { Text("000000") },
+                        leadingIcon = { Icon(Icons.Default.Lock, null, tint = vinoUpt) },
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        enabled = !isLoading,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textAlign = TextAlign.Center
                     )
-                )
+                }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
                 Button(
                     onClick = {
-                        if (email.isBlank() || confirmEmail.isBlank()) {
-                            scope.launch { snackbarHostState.showSnackbar("Por favor complete todos los campos") }
-                            return@Button
-                        }
-                        if (email.trim().lowercase() != confirmEmail.trim().lowercase()) {
-                            scope.launch { snackbarHostState.showSnackbar("Los correos electrónicos no coinciden") }
-                            return@Button
-                        }
-
-                        isLoading = true
-                        scope.launch {
-                            val response = authService.recoverPassword(email.trim().lowercase())
-                            isLoading = false
-                            if (response.success) {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Credenciales enviadas a tu correo")
-                                    onBack()
+                        if (step == 1) {
+                            if (email.isBlank()) {
+                                scope.launch { snackbarHostState.showSnackbar("Ingresa tu correo") }
+                                return@Button
+                            }
+                            isLoading = true
+                            scope.launch {
+                                val response = authService.recoverPassword(email.trim().lowercase())
+                                isLoading = false
+                                if (response.success) {
+                                    step = 2
+                                    snackbarHostState.showSnackbar("Código enviado a tu correo")
+                                } else {
+                                    snackbarHostState.showSnackbar(response.message)
                                 }
-                            } else {
-                                snackbarHostState.showSnackbar(response.message)
+                            }
+                        } else {
+                            if (code.length != 6) {
+                                scope.launch { snackbarHostState.showSnackbar("El código debe ser de 6 dígitos") }
+                                return@Button
+                            }
+                            isLoading = true
+                            scope.launch {
+                                val response = authService.verifyCode(email.trim().lowercase(), code)
+                                isLoading = false
+                                if (response.success && response.user != null) {
+                                    val u = response.user
+                                    // Iniciar sesión con los datos recibidos
+                                    SessionManager.iniciarSesion(
+                                        nombre = u.nombre,
+                                        apellidos = u.apellidos,
+                                        email = u.email,
+                                        rol = u.rol,
+                                        unidad = u.numeroUnidad,
+                                        telefono = u.telefono,
+                                        edad = u.edad,
+                                        horario = u.horario
+                                    )
+                                    onLoginSuccess(u.rol.lowercase())
+                                } else {
+                                    snackbarHostState.showSnackbar(response.message)
+                                }
                             }
                         }
                     },
@@ -169,7 +194,17 @@ fun ForgotPasswordScreen(
                     if (isLoading) {
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("Enviar Contraseña", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(if (step == 1) "Enviar Código" else "Verificar y Entrar", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                if (step == 2) {
+                    TextButton(
+                        onClick = { step = 1 },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isLoading
+                    ) {
+                        Text("¿No recibiste el código? Cambiar correo", color = vinoUpt)
                     }
                 }
             }

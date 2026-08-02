@@ -9,7 +9,14 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+
+@Serializable
+data class VerifyCodeRequest(
+    val email: String,
+    val code: String
+)
 
 class AuthApiService {
     private val baseUrl = "https://rutaupt-production.up.railway.app/api"
@@ -22,9 +29,8 @@ class AuthApiService {
                 isLenient = true
             })
         }
-        // Agregamos tiempo de espera extendido para el envío de correos
         install(HttpTimeout) {
-            requestTimeoutMillis = 60000 // 60 segundos
+            requestTimeoutMillis = 60000 
             connectTimeoutMillis = 15000
             socketTimeoutMillis = 60000
         }
@@ -60,6 +66,7 @@ class AuthApiService {
 
     suspend fun recoverPassword(email: String): RegisterResponse {
         return try {
+            // El servidor ahora generará un código de 6 dígitos y lo enviará al correo
             val response = client.post("$baseUrl/auth/recover") {
                 contentType(ContentType.Application.Json)
                 setBody(RecoveryRequest(email))
@@ -71,7 +78,24 @@ class AuthApiService {
                 RegisterResponse(false, error?.message ?: "Error al recuperar (${response.status.value})")
             }
         } catch (e: Exception) {
-            RegisterResponse(false, "Error de conexión o tiempo excedido. El servidor tardó demasiado en enviar el correo.")
+            RegisterResponse(false, "Error de conexión o tiempo excedido.")
+        }
+    }
+
+    suspend fun verifyCode(email: String, code: String): LoginResponse {
+        return try {
+            val response = client.post("$baseUrl/auth/verify-code") {
+                contentType(ContentType.Application.Json)
+                setBody(VerifyCodeRequest(email, code))
+            }
+            if (response.status.isSuccess()) {
+                response.body()
+            } else {
+                val error = try { response.body<LoginResponse>() } catch(e: Exception) { null }
+                LoginResponse(false, error?.message ?: "Código incorrecto o expirado")
+            }
+        } catch (e: Exception) {
+            LoginResponse(false, "Error al verificar el código")
         }
     }
 

@@ -61,7 +61,8 @@ fun App() {
                 onForgotPasswordClick = { navegarA("forgot_password") }
             )
             "forgot_password" -> ForgotPasswordScreen(
-                onBack = { navegarA("login") }
+                onBack = { navegarA("login") },
+                onLoginSuccess = { navegarA(it) }
             )
             "registro_seleccion" -> RegisterSelectionScreen(
                 onBack = { navegarA("login") },
