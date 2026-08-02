@@ -3,6 +3,7 @@ package com.example.rutaupt.storage
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.example.rutaupt.getPlatform
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -18,19 +19,30 @@ object SessionManager {
     var edadUsuario by mutableStateOf("")
     var horarioUsuario by mutableStateOf("")
     
-    // Notificaciones leídas (para que el número se quite al abrir)
     var notificacionesVistasCount by mutableStateOf(0)
-    
-    // Lógica para 2 reportes al día
     var reportesEnviadosHoy by mutableStateOf(0)
     var fechaUltimoReporte by mutableStateOf("")
+
+    private val platform = getPlatform()
 
     private fun obtenerFechaActual(): String {
         return try {
             val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
             "${now.year}-${now.monthNumber}-${now.dayOfMonth}"
-        } catch (e: Exception) {
-            "2024-01-01"
+        } catch (e: Exception) { "2024-01-01" }
+    }
+
+    fun cargarSesionPersistida() {
+        rolUsuario = platform.getString("rol_usuario") ?: ""
+        if (rolUsuario.isNotEmpty()) {
+            nombreUsuario = platform.getString("nombre_usuario") ?: ""
+            apellidosUsuario = platform.getString("apellidos_usuario") ?: ""
+            emailUsuario = platform.getString("email_usuario") ?: ""
+            passwordUsuario = platform.getString("password_usuario") ?: ""
+            numeroUnidad = platform.getString("numero_unidad") ?: ""
+            telefonoUsuario = platform.getString("telefono_usuario") ?: ""
+            edadUsuario = platform.getString("edad_usuario") ?: ""
+            horarioUsuario = platform.getString("horario_usuario") ?: "Sin asignar"
         }
     }
 
@@ -54,8 +66,18 @@ object SessionManager {
         telefonoUsuario = telefono ?: ""
         edadUsuario = edad ?: ""
         horarioUsuario = horario ?: "Sin asignar"
-        notificacionesVistasCount = 0
         
+        // Persistir datos localmente
+        platform.saveString("nombre_usuario", nombreUsuario)
+        platform.saveString("apellidos_usuario", apellidosUsuario)
+        platform.saveString("email_usuario", emailUsuario)
+        platform.saveString("password_usuario", passwordUsuario)
+        platform.saveString("rol_usuario", rolUsuario)
+        platform.saveString("numero_unidad", numeroUnidad)
+        platform.saveString("telefono_usuario", telefonoUsuario)
+        platform.saveString("edad_usuario", edadUsuario)
+        platform.saveString("horario_usuario", horarioUsuario)
+
         val hoy = obtenerFechaActual()
         if (fechaUltimoReporte != hoy) {
             reportesEnviadosHoy = 0
@@ -84,10 +106,14 @@ object SessionManager {
         apellidosUsuario = ""
         emailUsuario = ""
         passwordUsuario = ""
+        rolUsuario = ""
         numeroUnidad = ""
         telefonoUsuario = ""
         edadUsuario = ""
         horarioUsuario = ""
         notificacionesVistasCount = 0
+        
+        // Limpiar persistencia local
+        platform.clearSettings()
     }
 }

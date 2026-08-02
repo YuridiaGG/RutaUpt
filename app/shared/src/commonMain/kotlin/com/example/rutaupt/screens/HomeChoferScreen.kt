@@ -43,7 +43,8 @@ import kotlinx.coroutines.CoroutineScope
 fun HomeChoferScreen(
     onLogout: () -> Unit,
     onConfiguracion: () -> Unit,
-    onVerReportes: () -> Unit
+    onVerReportes: () -> Unit,
+    onNavigateToRuta: (Parada) -> Unit // Añadido para ver ubicación de paradas
 ) {
     val vinoUpt = UPTColors.Vino
     val vinoOscuro = UPTColors.VinoOscuro
@@ -101,8 +102,8 @@ fun HomeChoferScreen(
                                     DropdownMenuItem(
                                         text = {
                                             Column {
-                                                Text(reporte.mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                Text(reporte.tiempo, fontSize = 10.sp, color = Color.Gray)
+                                                Text(reporte.mensaje ?: "", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                Text(reporte.tiempo ?: "", fontSize = 10.sp, color = Color.Gray)
                                             }
                                         },
                                         onClick = { showNotifications = false }
@@ -122,7 +123,7 @@ fun HomeChoferScreen(
         Column(modifier = Modifier.fillMaxSize().padding(padding).background(fondoGris)) {
             AnimatedContent(targetState = selectedTab) { tab ->
                 when (tab) {
-                    "Inicio" -> ChoferInicioSection(vinoUpt, vinoOscuro)
+                    "Inicio" -> ChoferInicioSection(vinoUpt, vinoOscuro, onNavigateToRuta)
                     "Mapa" -> ChoferMapaSection(vinoUpt)
                 }
             }
@@ -131,7 +132,7 @@ fun HomeChoferScreen(
 }
 
 @Composable
-fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color) {
+fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: (Parada) -> Unit) {
     val scope = rememberCoroutineScope()
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Box(modifier = Modifier.fillMaxWidth().height(180.dp).background(Brush.verticalGradient(listOf(vinoUpt, vinoOscuro)), RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))) {
@@ -191,7 +192,8 @@ fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color) {
                                             )
                                         )
                                     }
-                                }
+                                },
+                                onClick = { onNavigateToRuta(parada) } // Al tocar la parada, ir al mapa
                             )
                         }
                     }
@@ -349,8 +351,8 @@ fun ChoferMapaSection(vinoUpt: Color) {
 }
 
 @Composable
-fun ChoferStopItem(name: String, time: String, active: Boolean, isFirst: Boolean, isLast: Boolean, onPassed: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+fun ChoferStopItem(name: String, time: String, active: Boolean, isFirst: Boolean, isLast: Boolean, onPassed: () -> Unit, onClick: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.width(30.dp).heightIn(min = 55.dp), contentAlignment = Alignment.Center) {
             if (!isFirst) Box(modifier = Modifier.width(2.dp).fillMaxHeight(0.5f).align(Alignment.TopCenter).background(Color.LightGray))
             if (!isLast) Box(modifier = Modifier.width(2.dp).fillMaxHeight(0.5f).align(Alignment.BottomCenter).background(Color.LightGray))

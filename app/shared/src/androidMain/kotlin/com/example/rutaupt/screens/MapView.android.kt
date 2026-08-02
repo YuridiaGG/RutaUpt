@@ -23,6 +23,8 @@ actual fun MapComponent(
     longitude: Double,
     title: String,
     paradas: List<Parada>,
+    pickedLocation: Pair<Double, Double>?,
+    gesturesEnabled: Boolean,
     onParadaSelected: (Parada) -> Unit,
     onMapClick: (Double, Double) -> Unit
 ) {
@@ -55,7 +57,6 @@ actual fun MapComponent(
         }
     }
 
-    // VERIFICACIÓN DE PERMISOS PARA EVITAR SecurityException (Causante de los cierres)
     val hasFineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     val hasCoarseLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     val canShowLocation = hasFineLocation || hasCoarseLocation
@@ -67,7 +68,6 @@ actual fun MapComponent(
             onMapClick(latLng.latitude, latLng.longitude)
         },
         properties = MapProperties(
-            // Solo activamos la capa de ubicación si Android confirma que tenemos el permiso
             isMyLocationEnabled = canShowLocation,
             mapType = MapType.NORMAL
         ),
@@ -75,34 +75,37 @@ actual fun MapComponent(
             myLocationButtonEnabled = canShowLocation,
             zoomControlsEnabled = false,
             mapToolbarEnabled = true,
-            compassEnabled = true
+            compassEnabled = true,
+            scrollGesturesEnabled = gesturesEnabled,
+            zoomGesturesEnabled = gesturesEnabled,
+            tiltGesturesEnabled = gesturesEnabled,
+            rotationGesturesEnabled = gesturesEnabled
         )
     ) {
+        // Marcadores de paradas existentes
         paradas.forEach { parada ->
             val coords = LocationUtils.extraerCoordenadas(parada.ubicacion)
             if (coords != null) {
                 val stopLoc = LatLng(coords.first, coords.second)
-                
-                val metros = LocationUtils.calcularDistanciaMetros(latitude, longitude, coords.first, coords.second)
-                val distStr = LocationUtils.formatoDistancia(metros)
-                val tiempoMin = LocationUtils.calcularTiempoMinutos(metros)
-                
                 Marker(
                     state = MarkerState(position = stopLoc),
                     title = parada.nombre,
-                    snippet = "A $distStr - Aprox $tiempoMin min",
                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
                     onClick = {
                         onParadaSelected(parada)
-                        scope.launch {
-                            try {
-                                cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(stopLoc, 17f))
-                            } catch (e: Exception) {}
-                        }
                         false
                     }
                 )
             }
+        }
+
+        // Marcador de ubicación seleccionada (para agregar nueva parada)
+        pickedLocation?.let { (lat, lon) ->
+            Marker(
+                state = MarkerState(position = LatLng(lat, lon)),
+                title = "Nueva Parada",
+                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+            )
         }
     }
 }

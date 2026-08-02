@@ -145,7 +145,7 @@ fun HomeEstudianteScreen(
     }
 
     val avisosEstudiante = ReporteRepository.reportes.filter { 
-        it.mensaje.startsWith("Anónimo:") || it.estado == "Unidad llena" || it.estado == "Disponible" || it.estado?.startsWith("ParadaPasada_") == true
+        (it.mensaje?.startsWith("Anónimo:") == true) || it.estado == "Unidad llena" || it.estado == "Disponible" || it.estado?.startsWith("ParadaPasada_") == true
     }
 
     Scaffold(
@@ -171,8 +171,8 @@ fun HomeEstudianteScreen(
                                     DropdownMenuItem(
                                         text = { 
                                             Column {
-                                                Text(reporte.mensaje, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                                Text(reporte.tiempo, fontSize = 10.sp, color = Color.Gray)
+                                                Text(reporte.mensaje ?: "", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                                Text(reporte.tiempo ?: "", fontSize = 10.sp, color = Color.Gray)
                                             }
                                         },
                                         onClick = { showNotifications = false }
@@ -334,7 +334,7 @@ fun InicioSection(
 
                             StopItem(
                                 name = parada.nombre,
-                                status = (if (reportePaso != null) "Ya pasó Unidad ${reportePaso.unidad}" else "En espera") + infoUbicacion,
+                                status = (if (reportePaso != null) "Ya pasó Unidad ${reportePaso.unidad ?: ""}" else "En espera") + infoUbicacion,
                                 isFirst = index == 0,
                                 isLast = index == paradas.size - 1,
                                 color = if (reportePaso != null) Color(0xFF2E7D32) else Color.Gray,
@@ -362,7 +362,7 @@ fun InicioSection(
 
 @Composable
 fun AvisosSection(vinoUpt: Color) {
-    val avisosEstudiantes = ReporteRepository.reportes.filter { it.mensaje.startsWith("Anónimo:") }
+    val avisosEstudiantes = ReporteRepository.reportes.filter { it.mensaje?.startsWith("Anónimo:") == true }
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Avisos de Estudiantes", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = vinoUpt)
         Spacer(modifier = Modifier.height(16.dp))
@@ -373,8 +373,8 @@ fun AvisosSection(vinoUpt: Color) {
                         Icon(Icons.Default.Info, null, tint = vinoUpt, modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text(reporte.mensaje, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(reporte.tiempo, fontSize = 12.sp, color = Color.Gray)
+                            Text(reporte.mensaje ?: "", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(reporte.tiempo ?: "", fontSize = 12.sp, color = Color.Gray)
                         }
                     }
                 }

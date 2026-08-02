@@ -63,6 +63,7 @@ fun ReportesEstudiantesChoferScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(reportesReales) { reporte ->
+                    val mensaje = reporte.mensaje ?: ""
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -82,7 +83,7 @@ fun ReportesEstudiantesChoferScreen(
                             ) {
                                 Icon(
                                     when {
-                                        reporte.mensaje.contains("llena", ignoreCase = true) -> Icons.Default.Groups
+                                        mensaje.contains("llena", ignoreCase = true) -> Icons.Default.Groups
                                         reporte.tipo == ReporteTipo.ALERTA -> Icons.Default.Warning
                                         else -> Icons.Default.Info
                                     }, 
@@ -93,8 +94,8 @@ fun ReportesEstudiantesChoferScreen(
                             }
                             Spacer(Modifier.width(16.dp))
                             Column {
-                                Text(text = reporte.mensaje, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                                Text(text = reporte.tiempo, fontSize = 12.sp, color = Color.Gray)
+                                Text(text = mensaje, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text(text = reporte.tiempo ?: "", fontSize = 12.sp, color = Color.Gray)
                             }
                         }
                     }

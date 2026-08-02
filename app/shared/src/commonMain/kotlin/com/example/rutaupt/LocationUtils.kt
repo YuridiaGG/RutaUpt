@@ -3,46 +3,63 @@ package com.example.rutaupt
 import kotlin.math.*
 
 object LocationUtils {
-    // Coordenadas base (Tulancingo / UPT) para evitar el mapamundi vacío
+    // Tulancingo / UPT como punto de referencia
     const val DEFAULT_LAT = 20.1394
     const val DEFAULT_LON = -98.3190
 
     /**
-     * Extrae coordenadas de CUALQUIER link de Google Maps.
+     * Extrae coordenadas con alta precisión para Tulancingo/México.
+     * Soporta diversos formatos de Google Maps.
      */
     fun extraerCoordenadas(link: String?): Pair<Double, Double>? {
         if (link.isNullOrBlank()) return null
+        
         try {
-            // 1. Patrón lat,lon (ej: 20.123, -98.456)
-            val regexComma = Regex("([-+]?\\d+\\.\\d+),\\s*([-+]?\\d+\\.\\d+)")
-            val matchComma = regexComma.findAll(link).lastOrNull()
-            if (matchComma != null) {
-                val lat = matchComma.groupValues[1].toDouble()
-                val lon = matchComma.groupValues[2].toDouble()
-                if (lat in -90.0..90.0 && lon in -180.0..180.0) return Pair(lat, lon)
+            // 1. Patrón !3d...!4d... (Google Maps Desktop - Muy exacto)
+            val regexGoogle = Regex("!3d([-+]?\\d+\\.\\d+)!4d([-+]?\\d+\\.\\d+)")
+            regexGoogle.find(link)?.let { match ->
+                val lat = match.groupValues[1].toDouble()
+                val lon = match.groupValues[2].toDouble()
+                if (lat in 14.0..33.0 && lon in -118.0..-86.0) return Pair(lat, lon)
             }
 
-            // 2. Patrón de URL interna de Google (!3dLat!4dLon)
-            val regexGoogle = Regex("!3d([-+]?\\d+\\.\\d+)!4d([-+]?\\d+\\.\\d+)")
-            val matchGoogle = regexGoogle.find(link)
-            if (matchGoogle != null) {
-                val lat = matchGoogle.groupValues[1].toDouble()
-                val lon = matchGoogle.groupValues[2].toDouble()
-                if (lat in -90.0..90.0 && lon in -180.0..180.0) return Pair(lat, lon)
+            // 2. Patrón @lat,lon (Google Maps Mobile)
+            val regexAt = Regex("@([-+]?\\d+\\.\\d+),([-+]?\\d+\\.\\d+)")
+            regexAt.find(link)?.let { match ->
+                val lat = match.groupValues[1].toDouble()
+                val lon = match.groupValues[2].toDouble()
+                if (lat in 14.0..33.0 && lon in -118.0..-86.0) return Pair(lat, lon)
+            }
+
+            // 3. Patrón q=lat,lon o daddr=lat,lon
+            val regexQ = Regex("[qd](?:addr|)=([-+]?\\d+\\.\\d+),([-+]?\\d+\\.\\d+)")
+            regexQ.find(link)?.let { match ->
+                val lat = match.groupValues[1].toDouble()
+                val lon = match.groupValues[2].toDouble()
+                if (lat in 14.0..33.0 && lon in -118.0..-86.0) return Pair(lat, lon)
             }
             
-            // 3. Patrón con @ (formato móvil)
-            val regexAt = Regex("@([-+]?\\d+\\.\\d+),([-+]?\\d+\\.\\d+)")
-            val matchAt = regexAt.find(link)
-            if (matchAt != null) {
-                return Pair(matchAt.groupValues[1].toDouble(), matchAt.groupValues[2].toDouble())
+            // 4. Patrón genérico lat,lon
+            val regexComma = Regex("([-+]?\\d+\\.\\d+),\\s*([-+]?\\d+\\.\\d+)")
+            val matches = regexComma.findAll(link).toList()
+            for (match in matches) {
+                val lat = match.groupValues[1].toDouble()
+                val lon = match.groupValues[2].toDouble()
+                // Prioridad a lo que esté cerca de Tulancingo
+                if (lat in 19.5..20.5 && lon in -99.0..-98.0) return Pair(lat, lon)
+            }
+            
+            for (match in matches) {
+                val lat = match.groupValues[1].toDouble()
+                val lon = match.groupValues[2].toDouble()
+                if (lat in 14.0..33.0 && lon in -118.0..-86.0) return Pair(lat, lon)
             }
         } catch (e: Exception) {}
         return null
     }
 
     fun calcularDistanciaMetros(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371000.0 // Radio Tierra metros
+        val r = 6371000.0
         val dLat = (lat2 - lat1) * PI / 180.0
         val dLon = (lon2 - lon1) * PI / 180.0
         val a = sin(dLat / 2).pow(2.0) + cos(lat1 * PI / 180.0) * cos(lat2 * PI / 180.0) * sin(dLon / 2).pow(2.0)
@@ -51,14 +68,16 @@ object LocationUtils {
     }
 
     fun formatoDistancia(metros: Double): String {
-        return if (metros < 1000) "${metros.toInt()} m" else "${(metros / 1000.0).roundToOne(1)} km"
+        return if (metros < 1000) "${metros.toInt()} m" else "${(metros / 1000.0).roundTo(1)} km"
     }
 
     fun calcularTiempoMinutos(metros: Double): Int {
+        // Asumiendo velocidad promedio de micro en ciudad (aprox 30km/h -> 0.5km/min -> 500m/min)
+        // Pero para estudiante caminando o esperando, usemos algo más conservador
         return (metros / 80.0).toInt().coerceAtLeast(1)
     }
 
-    private fun Double.roundToOne(decimals: Int): Double {
+    private fun Double.roundTo(decimals: Int): Double {
         val factor = 10.0.pow(decimals)
         return (this * factor).toInt() / factor
     }

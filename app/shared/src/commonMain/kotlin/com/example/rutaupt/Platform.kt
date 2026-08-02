@@ -9,6 +9,11 @@ interface Platform {
     fun openCamera(onSuccess: (String) -> Unit)
     fun openUrl(url: String)
     fun exitApp()
+    
+    // Persistencia simple
+    fun saveString(key: String, value: String)
+    fun getString(key: String): String?
+    fun clearSettings()
 }
 
 expect fun getPlatform(): Platform

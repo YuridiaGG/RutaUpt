@@ -1,9 +1,6 @@
 package com.example.rutaupt.screens
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,9 +24,9 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.rutaupt.storage.ReporteRepository
 import com.example.rutaupt.model.ReporteUnidad
 import com.example.rutaupt.model.ReporteTipo
-import com.example.rutaupt.generated.resources.*
 import com.example.rutaupt.rememberBitmapFromBase64
 import kotlinx.coroutines.launch
+import kotlinx.datetime.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,157 +35,172 @@ fun ReportesUnidadesScreen(
 ) {
     val vinoUpt = UPTColors.Vino
     val scope = rememberCoroutineScope()
-    var imagenSeleccionada by remember { mutableStateOf<String?>(null) }
+    var searchDate by remember { mutableStateOf("") }
+    val selectedIds = remember { mutableStateListOf<Long>() }
+    var fullImage by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val filteredReportes = ReporteRepository.reportes.filter {
+        val dateStr = formatTime(it.id)
+        val unidad = it.unidad ?: ""
+        val mensaje = it.mensaje ?: ""
+        dateStr.contains(searchDate) || unidad.contains(searchDate) || mensaje.contains(searchDate, ignoreCase = true)
+    }.sortedByDescending { it.id }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Gestión de Reportes", fontWeight = FontWeight.Bold) },
+                title = { Text("Reportes y Evidencias", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onVolver) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = vinoUpt
-                )
+                actions = {
+                    if (selectedIds.isNotEmpty()) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                var count = 0
+                                selectedIds.toList().forEach { id ->
+                                    if (ReporteRepository.eliminarReporte(id)) count++
+                                }
+                                selectedIds.clear()
+                                snackbarHostState.showSnackbar("Eliminados $count reportes")
+                            }
+                        }) {
+                            Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red)
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White, titleContentColor = vinoUpt)
             )
         },
-        containerColor = Color(0xFFF8F9FA)
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        val listaReportes = ReporteRepository.reportes
-        
-        if (listaReportes.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Inbox, null, modifier = Modifier.size(48.dp), tint = Color.Gray)
-                    Text("No hay reportes para revisar", color = Color.Gray)
+        Column(modifier = Modifier.fillMaxSize().padding(padding).background(Color(0xFFF8F9FA))) {
+            OutlinedTextField(
+                value = searchDate,
+                onValueChange = { searchDate = it },
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                placeholder = { Text("Buscar unidad, mensaje o fecha...") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.White, unfocusedContainerColor = Color.White)
+            )
+
+            if (filteredReportes.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No hay reportes disponibles", color = Color.Gray)
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(listaReportes, key = { it.id }) { reporte ->
-                    ReporteCard(
-                        reporte = reporte,
-                        onValidar = { 
-                            scope.launch {
-                                ReporteRepository.actualizarValidacion(reporte.id, "VALIDADO") 
-                            }
-                        },
-                        onRechazar = { 
-                            scope.launch {
-                                ReporteRepository.actualizarValidacion(reporte.id, "RECHAZADO") 
-                            }
-                        },
-                        onVerImagen = { imagenSeleccionada = it }
-                    )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(filteredReportes) { reporte ->
+                        ReporteAdminCard(
+                            reporte = reporte,
+                            isSelected = selectedIds.contains(reporte.id),
+                            onToggleSelection = {
+                                if (selectedIds.contains(reporte.id)) selectedIds.remove(reporte.id)
+                                else selectedIds.add(reporte.id)
+                            },
+                            onValidar = { estado ->
+                                scope.launch {
+                                    if (ReporteRepository.actualizarValidacion(reporte.id, estado)) {
+                                        snackbarHostState.showSnackbar("Reporte $estado")
+                                    } else {
+                                        snackbarHostState.showSnackbar("Error al actualizar estado")
+                                    }
+                                }
+                            },
+                            onZoom = { fullImage = it }
+                        )
+                    }
                 }
             }
         }
 
-        // Diálogo para ver la foto en pantalla completa
-        imagenSeleccionada?.let { imgBase64 ->
-            FullScreenImageDialog(
-                base64 = imgBase64,
-                onDismiss = { imagenSeleccionada = null }
-            )
+        fullImage?.let { base64 ->
+            FullScreenImageDialog(base64) { fullImage = null }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun ReporteCard(
+fun ReporteAdminCard(
     reporte: ReporteUnidad,
-    onValidar: () -> Unit,
-    onRechazar: () -> Unit,
-    onVerImagen: (String) -> Unit
+    isSelected: Boolean,
+    onToggleSelection: () -> Unit,
+    onValidar: (String) -> Unit,
+    onZoom: (String) -> Unit
 ) {
-    val colorIcono = when(reporte.estado) {
-        "Retrasada (Validando)" -> Color(0xFFE67E22)
-        "Unidad llena" -> Color.Red
-        "Disponible" -> Color(0xFF27AE60)
-        else -> if (reporte.tipo == ReporteTipo.ALERTA) Color.Red else Color(0xFFF39C12)
-    }
-
+    val bitmap = rememberBitmapFromBase64(reporte.imagen)
+    val necesitaValidacion = (reporte.imagen != null || reporte.estado == "Retrasada") && reporte.validacionAdmin == null
+    
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { if (isSelected) onToggleSelection() else Unit },
+                onLongClick = onToggleSelection
+            ),
         shape = RoundedCornerShape(16.dp),
+        border = if (isSelected) BorderStroke(2.dp, Color.Blue) else null,
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(40.dp).background(colorIcono.copy(alpha = 0.1f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        if (!reporte.imagen.isNullOrEmpty()) Icons.Default.CameraAlt else Icons.Default.Info, 
-                        null, tint = colorIcono, modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Unidad ${reporte.unidad}", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text(reporte.tiempo, fontSize = 11.sp, color = Color.Gray)
-                }
-                if (!reporte.imagen.isNullOrEmpty()) {
-                    Surface(color = Color(0xFFFFEBEE), shape = RoundedCornerShape(4.dp)) {
-                        Text("EVIDENCIA", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.Red)
-                    }
-                }
+                Icon(
+                    if (reporte.tipo == ReporteTipo.ALERTA) Icons.Default.Warning else Icons.Default.Info, 
+                    null, 
+                    tint = if (reporte.tipo == ReporteTipo.ALERTA) Color.Red else Color(0xFFF39C12)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Unidad ${reporte.unidad ?: "S/N"}", fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                Text(formatTime(reporte.id), fontSize = 11.sp, color = Color.Gray)
             }
             
-            Spacer(Modifier.height(12.dp))
-            Text(text = reporte.mensaje, fontSize = 14.sp, color = Color.Black)
+            Text(reporte.mensaje ?: "", modifier = Modifier.padding(vertical = 8.dp), fontSize = 14.sp)
             
-            if (!reporte.imagen.isNullOrEmpty()) {
-                val bitmap = rememberBitmapFromBase64(reporte.imagen)
-                Spacer(Modifier.height(12.dp))
-                Text("Toca la imagen para ampliar:", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.Gray)
-                Spacer(Modifier.height(6.dp))
-                Box(
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(180.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFF0F0F0))
-                        .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
-                        .clickable { onVerImagen(reporte.imagen!!) },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (bitmap != null) {
-                        Image(bitmap = bitmap, contentDescription = "Evidencia", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                        Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.ZoomIn, null, tint = Color.White, modifier = Modifier.size(32.dp))
-                        }
-                    } else {
-                        Icon(Icons.Default.BrokenImage, null, tint = Color.Gray)
-                    }
-                }
+                        .clickable { reporte.imagen?.let { onZoom(it) } },
+                    contentScale = ContentScale.Crop
+                )
+            }
 
-                if (reporte.estado == "Retrasada (Validando)" && reporte.validacionAdmin == null) {
-                    Spacer(Modifier.height(16.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = onValidar, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF27AE60)), shape = RoundedCornerShape(10.dp)) {
-                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Validar")
-                        }
-                        Button(onClick = onRechazar, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color.Red), shape = RoundedCornerShape(10.dp)) {
-                            Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Rechazar")
-                        }
-                    }
-                } else if (reporte.validacionAdmin != null) {
-                    Spacer(Modifier.height(12.dp))
-                    StatusTag(reporte.validacionAdmin!!)
+            if (necesitaValidacion) {
+                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { onValidar("Denegado") }) { Text("Denegar", color = Color.Red) }
+                    Button(
+                        onClick = { onValidar("Aceptado") },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                    ) { Text("Aceptar Evidencia") }
+                }
+            } else if (reporte.validacionAdmin != null) {
+                Surface(
+                    color = if (reporte.validacionAdmin == "Aceptado") Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(top = 8.dp).align(Alignment.End)
+                ) {
+                    Text(
+                        text = "VISTO: ${reporte.validacionAdmin}",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = if (reporte.validacionAdmin == "Aceptado") Color(0xFF2E7D32) else Color.Red
+                    )
                 }
             }
         }
@@ -198,52 +210,36 @@ fun ReporteCard(
 @Composable
 fun FullScreenImageDialog(base64: String, onDismiss: () -> Unit) {
     val bitmap = rememberBitmapFromBase64(base64)
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-            if (bitmap != null) {
-                Image(
-                    bitmap = bitmap,
-                    contentDescription = "Zoom",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black).clickable { onDismiss() }, contentAlignment = Alignment.Center) {
+            bitmap?.let {
+                Image(bitmap = it, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
             }
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.align(Alignment.TopEnd).padding(16.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)
-            ) {
+            IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)) {
                 Icon(Icons.Default.Close, null, tint = Color.White)
             }
         }
     }
 }
 
-@Composable
-fun StatusTag(status: String) {
-    val isValid = status == "VALIDADO"
-    Surface(
-        color = if (isValid) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                if (isValid) Icons.Default.CheckCircle else Icons.Default.Cancel,
-                null, tint = if (isValid) Color(0xFF2E7D32) else Color.Red, modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = if (isValid) "RETRASO VALIDADO" else "RETRASO RECHAZADO",
-                color = if (isValid) Color(0xFF2E7D32) else Color.Red,
-                fontWeight = FontWeight.ExtraBold, fontSize = 12.sp
-            )
-        }
-    }
+private fun formatTime(ms: Long): String {
+    // Si el ID es muy pequeño (como 0), no es una fecha válida (evita 1969/1970)
+    if (ms < 1000000L) return "Reciente"
+    
+    return try {
+        // Detectar si son segundos (10 dígitos) o milisegundos (13 dígitos)
+        val timestamp = if (ms < 10000000000L) ms * 1000 else ms
+        val instant = Instant.fromEpochMilliseconds(timestamp)
+        val dt = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+        
+        // Tulancingo es UTC-6. Si por error sale una fecha muy vieja, mostramos "Reciente"
+        if (dt.year < 2024) return "Reciente"
+
+        val day = dt.dayOfMonth.toString().padStart(2, '0')
+        val month = dt.monthNumber.toString().padStart(2, '0')
+        val hour = dt.hour.toString().padStart(2, '0')
+        val min = dt.minute.toString().padStart(2, '0')
+        
+        "$day/$month/${dt.year} $hour:$min"
+    } catch (e: Exception) { "Reciente" }
 }

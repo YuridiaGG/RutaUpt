@@ -18,6 +18,10 @@ import androidx.core.app.NotificationCompat
 class AndroidPlatform(private val context: Context?) : Platform {
     override val name: String = "Android ${Build.VERSION.SDK_INT}"
 
+    private val prefs by lazy {
+        context?.getSharedPreferences("ruta_upt_prefs", Context.MODE_PRIVATE)
+    }
+
     override fun showNotification(title: String, message: String) {
         context?.let { ctx ->
             val notificationManager = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -70,8 +74,19 @@ class AndroidPlatform(private val context: Context?) : Platform {
         (context as? Activity)?.finishAffinity() ?: (context as? android.content.ContextWrapper)?.baseContext?.let { 
             if (it is Activity) it.finishAffinity() 
         }
-        // Alternativa si el cast falla
         System.exit(0)
+    }
+
+    override fun saveString(key: String, value: String) {
+        prefs?.edit()?.putString(key, value)?.apply()
+    }
+
+    override fun getString(key: String): String? {
+        return prefs?.getString(key, null)
+    }
+
+    override fun clearSettings() {
+        prefs?.edit()?.clear()?.apply()
     }
 }
 
@@ -94,8 +109,11 @@ actual fun rememberBitmapFromBase64(base64: String?): ImageBitmap? {
                 .trim()
 
             val imageBytes = Base64.decode(cleanBase64, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)?.asImageBitmap()
-        } catch (e: Exception) {
+            val options = BitmapFactory.Options().apply {
+                inSampleSize = 2 
+            }
+            BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options)?.asImageBitmap()
+        } catch (t: Throwable) {
             null
         }
     }
