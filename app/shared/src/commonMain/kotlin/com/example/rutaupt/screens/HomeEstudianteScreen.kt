@@ -56,7 +56,6 @@ fun HomeEstudianteScreen(
         mutableStateOf(LocationBridge.hasPermission?.invoke() ?: false) 
     }
 
-    // Estados de ubicación y detección
     var currentUserLat by remember { mutableStateOf<Double?>(null) }
     var currentUserLon by remember { mutableStateOf<Double?>(null) }
     var isUserMoving by remember { mutableStateOf(false) }
@@ -120,7 +119,6 @@ fun HomeEstudianteScreen(
         }
     }
 
-    // Suscripción al GPS
     DisposableEffect(hasLocationPermission) {
         if (hasLocationPermission) {
             LocationBridge.getCurrentLocation?.invoke { lat, lon -> 
@@ -257,7 +255,6 @@ fun InicioSection(
     onSendReport: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        // Cabecera Bienvenida
         Box(modifier = Modifier.fillMaxWidth().height(160.dp).background(Brush.verticalGradient(listOf(vinoUpt, vinoOscuro)), RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)).padding(horizontal = 24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -269,8 +266,6 @@ fun InicioSection(
         }
 
         Column(modifier = Modifier.padding(16.dp)) {
-            
-            // --- SECCIÓN: MI RUTA (TARJETA GEMINI) ---
             SectionTitle("Mi ruta")
             
             val microParaMostrar = nearbyUnit ?: UbicacionVehiculo("12", 20.14, -98.32, 0L)
@@ -292,8 +287,7 @@ fun InicioSection(
 
             SectionTitle("Mi ubicación")
             Card(
-                modifier = Modifier.fillMaxWidth().height(220.dp).padding(vertical = 8.dp)
-                    .clickable { onNavigateToRuta(null) }, // Al picarle se amplía el mapa
+                modifier = Modifier.fillMaxWidth().height(220.dp).padding(vertical = 8.dp),
                 shape = RoundedCornerShape(16.dp), 
                 elevation = CardDefaults.cardElevation(4.dp)
             ) {
@@ -303,8 +297,17 @@ fun InicioSection(
                         latitude = curLat,
                         longitude = curLon,
                         title = "Mi Ubicación",
-                        paradas = ParadaRepository.paradas
+                        paradas = ParadaRepository.paradas,
+                        onMapClick = { _, _ -> onNavigateToRuta(null) }
                     )
+                    
+                    // Botón para ampliar (ayuda al usuario a saber que puede ir al mapa completo)
+                    IconButton(
+                        onClick = { onNavigateToRuta(null) },
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp).background(Color.White.copy(alpha = 0.7f), CircleShape)
+                    ) {
+                        Icon(Icons.Default.OpenInFull, null, tint = vinoUpt, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
 
@@ -318,7 +321,6 @@ fun InicioSection(
                         paradas.forEachIndexed { index, parada ->
                             val reportePaso = ReporteRepository.reportes.find { it.estado == "ParadaPasada_${parada.nombre}" }
                             
-                            // Lógica de distancia en km basada en el link de Google Maps
                             val coordsParada = LocationUtils.extraerCoordenadas(parada.ubicacion)
                             val studentLat = currentUserLat
                             val studentLon = currentUserLon
@@ -338,7 +340,7 @@ fun InicioSection(
                                 isFirst = index == 0,
                                 isLast = index == paradas.size - 1,
                                 color = if (reportePaso != null) Color(0xFF2E7D32) else Color.Gray,
-                                onClick = { onNavigateToRuta(parada) } // Al picar visualiza la ubicación en el mapa
+                                onClick = { onNavigateToRuta(parada) }
                             )
                         }
                     }

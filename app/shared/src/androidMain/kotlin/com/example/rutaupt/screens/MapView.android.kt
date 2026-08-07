@@ -14,7 +14,6 @@ import com.google.maps.android.compose.*
 import com.example.rutaupt.api.Parada
 import com.example.rutaupt.LocationUtils
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
-import kotlinx.coroutines.launch
 
 @Composable
 actual fun MapComponent(
@@ -29,81 +28,78 @@ actual fun MapComponent(
     onMapClick: (Double, Double) -> Unit
 ) {
     val context = LocalContext.current
-    val centerLocation = LatLng(latitude, longitude)
-    val scope = rememberCoroutineScope()
     
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(centerLocation, 15f)
-    }
-
-    // Inicialización segura del motor de mapas
     LaunchedEffect(Unit) {
         try {
             MapsInitializer.initialize(context)
-        } catch (e: Throwable) {}
+        } catch (e: Exception) {}
     }
 
-    // Centrado seguro de la cámara
-    LaunchedEffect(latitude, longitude) {
+    val safeLat = if (latitude != 0.0) latitude else LocationUtils.DEFAULT_LAT
+    val safeLon = if (longitude != 0.0) longitude else LocationUtils.DEFAULT_LON
+    val currentLatLng = LatLng(safeLat, safeLon)
+    
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(currentLatLng, 15f)
+    }
+
+    LaunchedEffect(safeLat, safeLon) {
         if (latitude != 0.0 && longitude != 0.0) {
-            try {
-                if (cameraPositionState.cameraMoveStartedReason != CameraMoveStartedReason.GESTURE) {
-                    cameraPositionState.animate(
-                        update = CameraUpdateFactory.newLatLng(centerLocation),
-                        durationMs = 1000
-                    )
-                }
-            } catch (e: Throwable) {}
+            if (cameraPositionState.cameraMoveStartedReason != CameraMoveStartedReason.GESTURE) {
+                cameraPositionState.animate(CameraUpdateFactory.newLatLng(currentLatLng))
+            }
         }
     }
 
-    val hasFineLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    val hasCoarseLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-    val canShowLocation = hasFineLocation || hasCoarseLocation
+    val canShowLocation = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     GoogleMap(
         modifier = modifier,
         cameraPositionState = cameraPositionState,
-        onMapClick = { latLng ->
-            onMapClick(latLng.latitude, latLng.longitude)
-        },
+        onMapClick = { latLng -> if (gesturesEnabled) onMapClick(latLng.latitude, latLng.longitude) },
         properties = MapProperties(
             isMyLocationEnabled = canShowLocation,
             mapType = MapType.NORMAL
         ),
         uiSettings = MapUiSettings(
-            myLocationButtonEnabled = canShowLocation,
-            zoomControlsEnabled = false,
-            mapToolbarEnabled = true,
-            compassEnabled = true,
+            zoomControlsEnabled = true,        // Botones +/- para facilitar zoom si el pellizco falla por el scroll parent
+            zoomGesturesEnabled = true,        // Habilita zoom por pellizco siempre
             scrollGesturesEnabled = gesturesEnabled,
-            zoomGesturesEnabled = gesturesEnabled,
             tiltGesturesEnabled = gesturesEnabled,
-            rotationGesturesEnabled = gesturesEnabled
+            rotationGesturesEnabled = gesturesEnabled,
+            myLocationButtonEnabled = canShowLocation && gesturesEnabled,
+            compassEnabled = true,
+            mapToolbarEnabled = true
         )
     ) {
-        // Marcadores de paradas existentes
+        if (pickedLocation == null) {
+            Marker(
+                state = rememberMarkerState(key = "main", position = currentLatLng),
+                title = title,
+                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
+            )
+        }
+
+        // Marcadores de paradas estables
         paradas.forEach { parada ->
-            val coords = LocationUtils.extraerCoordenadas(parada.ubicacion)
-            if (coords != null) {
-                val stopLoc = LatLng(coords.first, coords.second)
+            LocationUtils.extraerCoordenadas(parada.ubicacion)?.let { coords ->
                 Marker(
-                    state = MarkerState(position = stopLoc),
+                    state = rememberMarkerState(key = "stop_${parada.id ?: parada.nombre}", position = LatLng(coords.first, coords.second)),
                     title = parada.nombre,
-                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED),
-                    onClick = {
-                        onParadaSelected(parada)
-                        false
+                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_ORANGE),
+                    onClick = { 
+                        if (gesturesEnabled) onParadaSelected(parada)
+                        false 
                     }
                 )
             }
         }
 
-        // Marcador de ubicación seleccionada (para agregar nueva parada)
+        // Marcador de selección del Admin
         pickedLocation?.let { (lat, lon) ->
             Marker(
-                state = MarkerState(position = LatLng(lat, lon)),
-                title = "Nueva Parada",
+                state = rememberMarkerState(key = "picked", position = LatLng(lat, lon)),
+                title = "Ubicación seleccionada",
                 icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
             )
         }

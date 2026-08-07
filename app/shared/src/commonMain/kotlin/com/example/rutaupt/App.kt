@@ -35,7 +35,7 @@ fun App() {
         }
     }
 
-    // Manejo del botón atrás
+    // Manejo del botón atrás del sistema
     BackHandler(enabled = pantallaActual != "login") {
         when (pantallaActual) {
             "admin", "chofer", "estudiante" -> navegarA("login")
@@ -45,7 +45,8 @@ fun App() {
             "perfil_chofer", "reportes_estudiantes_chofer" -> navegarA("chofer")
             "perfil_estudiante" -> navegarA("estudiante")
             "ruta" -> {
-                val destino = if (SessionManager.rolUsuario.lowercase() == "chofer") "chofer" else "estudiante"
+                val rol = SessionManager.rolUsuario.lowercase()
+                val destino = if (rol == "chofer") "chofer" else "estudiante"
                 navegarA(destino)
             }
             "registro_seleccion", "forgot_password" -> navegarA("login")
@@ -177,7 +178,9 @@ fun App() {
                 initialParada = paradaSeleccionada,
                 onVolver = { 
                     paradaSeleccionada = null
-                    val destino = if (SessionManager.rolUsuario.lowercase() == "chofer") "chofer" else "estudiante"
+                    // REDIRECCIÓN DINÁMICA SEGÚN ROL
+                    val rol = SessionManager.rolUsuario.lowercase()
+                    val destino = if (rol == "chofer") "chofer" else "estudiante"
                     navegarA(destino)
                 }
             )

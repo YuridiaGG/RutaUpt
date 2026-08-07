@@ -44,7 +44,7 @@ fun HomeChoferScreen(
     onLogout: () -> Unit,
     onConfiguracion: () -> Unit,
     onVerReportes: () -> Unit,
-    onNavigateToRuta: (Parada) -> Unit // Añadido para ver ubicación de paradas
+    onNavigateToRuta: (Parada) -> Unit 
 ) {
     val vinoUpt = UPTColors.Vino
     val vinoOscuro = UPTColors.VinoOscuro
@@ -53,8 +53,6 @@ fun HomeChoferScreen(
 
     var selectedTab by remember { mutableStateOf("Inicio") }
     var showNotifications by remember { mutableStateOf(false) }
-
-    // Lógica de notificaciones leídas
     var lastSeenCount by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
@@ -80,7 +78,7 @@ fun HomeChoferScreen(
                     Box {
                         IconButton(onClick = {
                             showNotifications = true
-                            lastSeenCount = notificacionesChofer.size // Marcar como leídas
+                            lastSeenCount = notificacionesChofer.size 
                         }) {
                             BadgedBox(
                                 badge = { if (unreadCount > 0) Badge { Text(unreadCount.toString()) } }
@@ -134,6 +132,11 @@ fun HomeChoferScreen(
 @Composable
 fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: (Parada) -> Unit) {
     val scope = rememberCoroutineScope()
+    val paradas = ParadaRepository.paradas
+    // Estado de paradas completadas (se resetea al finalizar ruta)
+    val paradasPasadas = remember { mutableStateMapOf<Long, Boolean>() }
+    val todasCompletadas = paradas.isNotEmpty() && paradasPasadas.size >= paradas.size
+
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Box(modifier = Modifier.fillMaxWidth().height(180.dp).background(Brush.verticalGradient(listOf(vinoUpt, vinoOscuro)), RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))) {
             Row(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -161,18 +164,22 @@ fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: (Pa
                 }
             }
 
-            // --- SECCIÓN: ESTADO ACTUAL ---
-            ChoferStatusSection(vinoUpt, scope)
+            // --- SECCIÓN: ESTADO ACTUAL (Con lógica de reset) ---
+            ChoferStatusSection(
+                vinoUpt = vinoUpt, 
+                scope = scope, 
+                canReset = todasCompletadas,
+                onResetParadas = { paradasPasadas.clear() }
+            )
 
-            Text("Marcar paso por parada", fontWeight = FontWeight.Bold, fontSize = 19.sp, modifier = Modifier.padding(bottom = 12.dp))
+            Text("Marcar paso por parada (${paradasPasadas.size}/${paradas.size})", fontWeight = FontWeight.Bold, fontSize = 19.sp, modifier = Modifier.padding(bottom = 12.dp))
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(2.dp)) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    val paradas = ParadaRepository.paradas
                     if (paradas.isEmpty()) {
                         Text("No hay paradas asignadas", color = Color.Gray)
                     } else {
                         paradas.forEachIndexed { index, parada ->
-                            var isPassed by remember { mutableStateOf(false) }
+                            val isPassed = paradasPasadas[parada.id ?: -1L] ?: false
                             ChoferStopItem(
                                 name = parada.nombre,
                                 time = if (isPassed) "Completada" else "--:--",
@@ -180,7 +187,9 @@ fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: (Pa
                                 isFirst = index == 0,
                                 isLast = index == paradas.size - 1,
                                 onPassed = {
-                                    isPassed = true
+                                    parada.id?.let { id -> 
+                                        paradasPasadas[id] = true 
+                                    }
                                     scope.launch {
                                         ReporteRepository.agregarReporte(
                                             ReporteUnidad(
@@ -193,7 +202,7 @@ fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: (Pa
                                         )
                                     }
                                 },
-                                onClick = { onNavigateToRuta(parada) } // Al tocar la parada, ir al mapa
+                                onClick = { onNavigateToRuta(parada) }
                             )
                         }
                     }
@@ -205,7 +214,12 @@ fun ChoferInicioSection(vinoUpt: Color, vinoOscuro: Color, onNavigateToRuta: (Pa
 }
 
 @Composable
-fun ChoferStatusSection(vinoUpt: Color, scope: CoroutineScope) {
+fun ChoferStatusSection(
+    vinoUpt: Color, 
+    scope: CoroutineScope, 
+    canReset: Boolean,
+    onResetParadas: () -> Unit
+) {
     var currentStatus by remember { mutableStateOf("En recorrido") }
 
     Column(modifier = Modifier.padding(bottom = 24.dp)) {
@@ -290,6 +304,10 @@ fun ChoferStatusSection(vinoUpt: Color, scope: CoroutineScope) {
                         )
                     )
                     currentStatus = "Finalizado"
+                    // REINICIO DE PARADAS: Solo si ya pasó por todas
+                    if (canReset) {
+                        onResetParadas()
+                    }
                 }
             }
         }

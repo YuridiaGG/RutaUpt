@@ -44,7 +44,6 @@ fun GestionarParadasScreen(
     var editingParada by remember { mutableStateOf<Parada?>(null) }
     var isActionLoading by remember { mutableStateOf(false) }
 
-    // Ubicación inicial del mapa (Tulancingo por defecto)
     var mapCenterLat by remember { mutableStateOf(LocationUtils.DEFAULT_LAT) }
     var mapCenterLon by remember { mutableStateOf(LocationUtils.DEFAULT_LON) }
 
@@ -79,152 +78,157 @@ fun GestionarParadasScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color(0xFFF8F9FA)
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(bottom = 32.dp)
-        ) {
-            item {
-                Box(modifier = Modifier.fillMaxWidth().height(350.dp)) {
-                    MapComponent(
-                        modifier = Modifier.fillMaxSize(),
-                        latitude = mapCenterLat,
-                        longitude = mapCenterLon,
-                        paradas = paradas,
-                        pickedLocation = pickedLocation,
-                        onMapClick = { lat, lon ->
-                            pickedLocation = Pair(lat, lon)
-                        }
+        // CAMBIO: Usamos una Column para que el Mapa sea fijo y no pierda gestos de zoom
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            
+            // MAPA FIJO (Fuera de la lista para permitir zoom sin conflictos)
+            Box(modifier = Modifier.fillMaxWidth().height(350.dp)) {
+                MapComponent(
+                    modifier = Modifier.fillMaxSize(),
+                    latitude = mapCenterLat,
+                    longitude = mapCenterLon,
+                    paradas = paradas,
+                    pickedLocation = pickedLocation,
+                    gesturesEnabled = true,
+                    onMapClick = { lat, lon ->
+                        pickedLocation = Pair(lat, lon)
+                    }
+                )
+                
+                Surface(
+                    modifier = Modifier.align(Alignment.TopCenter).padding(16.dp),
+                    color = Color.Black.copy(alpha = 0.6f),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Text(
+                        "Toca el mapa para ubicar la parada",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     )
-                    
-                    Surface(
-                        modifier = Modifier.align(Alignment.TopCenter).padding(16.dp),
-                        color = Color.Black.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text(
-                            "Toca el mapa para ubicar la parada",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                }
+
+                SmallFloatingActionButton(
+                    onClick = {
+                        LocationBridge.getCurrentLocation?.invoke { lat, lon ->
+                            mapCenterLat = lat
+                            mapCenterLon = lon
+                        }
+                    },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+                    containerColor = Color.White,
+                    contentColor = vinoUpt
+                ) {
+                    Icon(Icons.Default.MyLocation, null)
+                }
+            }
+
+            // LISTA SCROLLABLE (Solo para el formulario y las paradas)
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                contentPadding = PaddingValues(bottom = 32.dp)
+            ) {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                OutlinedTextField(
+                                    value = nombreParada,
+                                    onValueChange = { nombreParada = it },
+                                    label = { Text("Nombre de la parada") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                
+                                Spacer(Modifier.height(8.dp))
+                                
+                                val locationStatus = if (pickedLocation != null) "Ubicación seleccionada ✓" else "Selecciona en el mapa ⚠"
+                                Text(locationStatus, fontSize = 12.sp, color = if(pickedLocation != null) Color(0xFF2E7D32) else Color.Red, fontWeight = FontWeight.Bold)
+
+                                Spacer(Modifier.height(12.dp))
+                                
+                                Button(
+                                    onClick = {
+                                        if (nombreParada.isNotBlank() && pickedLocation != null) {
+                                            isActionLoading = true
+                                            scope.launch {
+                                                val ubiString = "${pickedLocation!!.first},${pickedLocation!!.second}"
+                                                val success = if (editingParada == null) {
+                                                    ParadaRepository.agregarParada(nombreParada, ubiString)
+                                                } else {
+                                                    val actualizada = editingParada!!.copy(nombre = nombreParada, ubicacion = ubiString)
+                                                    ParadaRepository.actualizarParada(actualizada)
+                                                }
+
+                                                if (success) {
+                                                    snackbarHostState.showSnackbar(if (editingParada == null) "Parada guardada" else "Actualizada")
+                                                    editingParada = null
+                                                    nombreParada = ""
+                                                    pickedLocation = null
+                                                } else {
+                                                    snackbarHostState.showSnackbar("Error al guardar")
+                                                }
+                                                isActionLoading = false
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(containerColor = vinoUpt),
+                                    shape = RoundedCornerShape(12.dp),
+                                    enabled = !isActionLoading && nombreParada.isNotBlank() && pickedLocation != null
+                                ) {
+                                    Icon(if (editingParada == null) Icons.Default.Add else Icons.Default.Save, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(if (editingParada == null) "Guardar Parada" else "Actualizar Parada")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        "Paradas Registradas (${paradas.size}):", 
+                        fontWeight = FontWeight.Bold, 
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
+                    )
+                }
+
+                items(paradas) { parada ->
+                    Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)) {
+                        ListItem(
+                            headlineContent = { Text(parada.nombre, fontWeight = FontWeight.Bold) },
+                            supportingContent = { Text(parada.ubicacion ?: "", fontSize = 10.sp, maxLines = 1) },
+                            leadingContent = { Icon(Icons.Default.LocationOn, null, tint = vinoUpt) },
+                            trailingContent = {
+                                IconButton(onClick = {
+                                    scope.launch {
+                                        parada.id?.let { ParadaRepository.eliminarParada(it) }
+                                    }
+                                }) {
+                                    Icon(Icons.Default.Delete, null, tint = Color.LightGray)
+                                }
+                            },
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White)
+                                .clickable {
+                                    editingParada = parada
+                                    nombreParada = parada.nombre
+                                    pickedLocation = LocationUtils.extraerCoordenadas(parada.ubicacion)
+                                    pickedLocation?.let { 
+                                        mapCenterLat = it.first
+                                        mapCenterLon = it.second
+                                    }
+                                }
                         )
                     }
-
-                    SmallFloatingActionButton(
-                        onClick = {
-                            LocationBridge.getCurrentLocation?.invoke { lat, lon ->
-                                mapCenterLat = lat
-                                mapCenterLon = lon
-                            }
-                        },
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                        containerColor = Color.White,
-                        contentColor = vinoUpt
-                    ) {
-                        Icon(Icons.Default.MyLocation, null)
-                    }
-                }
-            }
-
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(4.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            OutlinedTextField(
-                                value = nombreParada,
-                                onValueChange = { nombreParada = it },
-                                label = { Text("Nombre de la parada") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            
-                            Spacer(Modifier.height(8.dp))
-                            
-                            val locationStatus = if (pickedLocation != null) "Ubicación seleccionada ✓" else "Selecciona en el mapa ⚠"
-                            Text(locationStatus, fontSize = 12.sp, color = if(pickedLocation != null) Color(0xFF2E7D32) else Color.Red, fontWeight = FontWeight.Bold)
-
-                            Spacer(Modifier.height(12.dp))
-                            
-                            Button(
-                                onClick = {
-                                    if (nombreParada.isNotBlank() && pickedLocation != null) {
-                                        isActionLoading = true
-                                        scope.launch {
-                                            val ubiString = "${pickedLocation!!.first},${pickedLocation!!.second}"
-                                            val success = if (editingParada == null) {
-                                                ParadaRepository.agregarParada(nombreParada, ubiString)
-                                            } else {
-                                                val actualizada = editingParada!!.copy(nombre = nombreParada, ubicacion = ubiString)
-                                                ParadaRepository.actualizarParada(actualizada)
-                                            }
-
-                                            if (success) {
-                                                snackbarHostState.showSnackbar(if (editingParada == null) "Parada guardada" else "Actualizada")
-                                                editingParada = null
-                                                nombreParada = ""
-                                                pickedLocation = null
-                                            } else {
-                                                snackbarHostState.showSnackbar("Error al guardar")
-                                            }
-                                            isActionLoading = false
-                                        }
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = vinoUpt),
-                                shape = RoundedCornerShape(12.dp),
-                                enabled = !isActionLoading && nombreParada.isNotBlank() && pickedLocation != null
-                            ) {
-                                Icon(if (editingParada == null) Icons.Default.Add else Icons.Default.Save, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(if (editingParada == null) "Guardar Parada" else "Actualizar Parada")
-                            }
-                        }
-                    }
-                }
-            }
-
-            item {
-                Text(
-                    "Paradas Registradas (${paradas.size}):", 
-                    fontWeight = FontWeight.Bold, 
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
-                )
-            }
-
-            items(paradas) { parada ->
-                Box(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)) {
-                    ListItem(
-                        headlineContent = { Text(parada.nombre, fontWeight = FontWeight.Bold) },
-                        supportingContent = { Text(parada.ubicacion ?: "", fontSize = 10.sp, maxLines = 1) },
-                        leadingContent = { Icon(Icons.Default.LocationOn, null, tint = vinoUpt) },
-                        trailingContent = {
-                            IconButton(onClick = {
-                                scope.launch {
-                                    parada.id?.let { ParadaRepository.eliminarParada(it) }
-                                }
-                            }) {
-                                Icon(Icons.Default.Delete, null, tint = Color.LightGray)
-                            }
-                        },
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White)
-                            .clickable {
-                                editingParada = parada
-                                nombreParada = parada.nombre
-                                pickedLocation = LocationUtils.extraerCoordenadas(parada.ubicacion)
-                                pickedLocation?.let { 
-                                    mapCenterLat = it.first
-                                    mapCenterLon = it.second
-                                }
-                            }
-                    )
                 }
             }
         }

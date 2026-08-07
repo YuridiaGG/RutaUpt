@@ -1,7 +1,6 @@
 package com.example.rutaupt.screens
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -26,6 +26,7 @@ import com.example.rutaupt.generated.resources.Res
 import com.example.rutaupt.generated.resources.imagentoro
 import com.example.rutaupt.api.AuthApiService
 import com.example.rutaupt.storage.SessionManager
+import com.example.rutaupt.model.User
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 
@@ -122,7 +123,9 @@ fun ForgotPasswordScreen(
                 } else {
                     OutlinedTextField(
                         value = code,
-                        onValueChange = { if (it.length <= 6) code = it },
+                        onValueChange = { inputString: String -> 
+                            if (inputString.length <= 6) code = inputString 
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Código de 6 dígitos") },
                         placeholder = { Text("000000") },
@@ -131,7 +134,7 @@ fun ForgotPasswordScreen(
                         singleLine = true,
                         enabled = !isLoading,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        textAlign = TextAlign.Center
+                        textStyle = TextStyle(textAlign = TextAlign.Center)
                     )
                 }
 
@@ -164,20 +167,25 @@ fun ForgotPasswordScreen(
                             scope.launch {
                                 val response = authService.verifyCode(email.trim().lowercase(), code)
                                 isLoading = false
-                                if (response.success && response.user != null) {
+                                if (response.success) {
                                     val u = response.user
-                                    // Iniciar sesión con los datos recibidos
-                                    SessionManager.iniciarSesion(
-                                        nombre = u.nombre,
-                                        apellidos = u.apellidos,
-                                        email = u.email,
-                                        rol = u.rol,
-                                        unidad = u.numeroUnidad,
-                                        telefono = u.telefono,
-                                        edad = u.edad,
-                                        horario = u.horario
-                                    )
-                                    onLoginSuccess(u.rol.lowercase())
+                                    if (u != null) {
+                                        // Iniciar sesión con los datos recibidos
+                                        SessionManager.iniciarSesion(
+                                            nombre = u.nombre,
+                                            apellidos = u.apellidos,
+                                            email = u.email,
+                                            rol = u.rol,
+                                            unidad = u.numeroUnidad ?: "",
+                                            telefono = u.telefono ?: "",
+                                            edad = u.edad ?: "",
+                                            horario = u.horario ?: ""
+                                        )
+                                        val rolString = u.rol.toString().lowercase()
+                                        onLoginSuccess(rolString)
+                                    } else {
+                                        snackbarHostState.showSnackbar("Error: Datos de usuario no recibidos")
+                                    }
                                 } else {
                                     snackbarHostState.showSnackbar(response.message)
                                 }
